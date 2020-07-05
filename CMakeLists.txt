@@ -5,4 +5,8 @@ project(dmdiag LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(WIN32)
+	add_definitions(-DNOMINMAX)
+endif()
+
 add_executable(dmdiag internal_types.h dmdiag.h dmdiag.cpp elf.h)

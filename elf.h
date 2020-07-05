@@ -5,6 +5,8 @@
 #include <fstream>
 #include <vector>
 #include <valarray>
+#include <algorithm>
+#include <optional>
 
 // Mmmm
 
@@ -61,6 +63,26 @@ private:
 		uint32_t entry_size;
 	};
 
+	struct NoteHeader
+	{
+		uint32_t name_size;
+		uint32_t content_size;
+		uint32_t type;
+	};
+
+	struct NT_File_Header
+	{
+		uint32_t count;
+		uint32_t page_size;
+	};
+
+	struct NT_File_Element
+	{
+		uint32_t start;
+		uint32_t end;
+		uint32_t offset;
+	};
+
 public:
 	static ELF_File Parse(const char* path)
 	{
@@ -90,18 +112,6 @@ public:
 		return ELF_File {std::move(buffer)};
 	}
 
-	/*
-	* Format of NT_FILE note:
-	*
-	* long count     -- how many files are mapped
-	* long page_size -- units for file_ofs
-	* array of [COUNT] elements of
-	*   long start
-	*   long end
-	*   long file_ofs
-	* followed by COUNT filenames in ASCII: "FILE1" NUL "FILE2" NUL...
-	*/
-
 public:
 	ELF_File(std::vector<std::byte> in_buffer)
 		: buffer(std::move(in_buffer))
@@ -121,24 +131,56 @@ public:
 			throw;
 		}
 
-		for (size_t i = 0; i < header->programheader_count; i++)
+		for (uint32_t i = 0; i < header->programheader_count; i++)
 		{
 			std::byte* ptr = Read(header->programheader_offset + header->programheader_entry_size * i, header->programheader_entry_size);
 			program_headers.push_back(reinterpret_cast<ProgramHeader*>(ptr));
 		}
 
-		for (size_t i = 0; i < header->sectionheader_count; i++)
+		for (uint32_t i = 0; i < header->sectionheader_count; i++)
 		{
 			std::byte* ptr = Read(header->sectionheader_offset + header->sectionheader_entry_size * i, header->sectionheader_entry_size);
 			section_headers.push_back(reinterpret_cast<SectionHeader*>(ptr));
 		}
 
-		FindRanges();
-
 		return;
 	}
 
-	std::byte* Read(size_t offset, size_t size)
+	// Easy optimizations here
+	std::byte* Translate(uint32_t pointer, uint32_t size)
+	{
+		if (pointer + size < pointer)
+			return nullptr;
+
+		for (auto& ph : program_headers)
+		{
+			if (ph->virtual_address + ph->file_size < ph->virtual_address)
+				continue;
+
+			if (pointer < ph->virtual_address || (pointer + size) > (ph->virtual_address + ph->file_size))
+				continue;
+
+			uint32_t data_offset = pointer - ph->virtual_address;
+
+			if (ph->offset + data_offset < ph->offset)
+				continue;
+
+			uint32_t begin = ph->offset + data_offset;
+			uint32_t end = begin + size;
+
+			if (end < begin)
+				continue;
+
+			if (begin >= buffer.size() || end >= buffer.size())
+				continue;
+			
+			return &buffer[begin];
+		}
+
+		return nullptr;
+	}
+
+	std::byte* Read(uint32_t offset, uint32_t size)
 	{
 		std::byte* base = buffer.data();
 		size_t buffer_size = buffer.size();
@@ -153,17 +195,86 @@ public:
 		return base + offset;
 	}
 
-	void /*std::vector<std::pair<size_t, size_t>>*/ FindRanges()
+	// fixups needed here
+	std::optional<std::vector<std::pair<uint32_t, uint32_t>>> FindRegions()
 	{
 		for (auto& ph : program_headers)
 		{
 			if (ph->type != 0x00000004) // note
+			{
 				continue;
+			}
 
-			std::byte* data = Read(ph->offset, ph->file_size);
+			uint32_t begin = ph->offset;
+			uint32_t end = ph->offset + ph->file_size;
 
-			break;
+			if (end <= begin)
+			{
+				break;
+			}
+
+			uint32_t current = begin;
+			while (current <= end)
+			{
+				NoteHeader* note_header = reinterpret_cast<NoteHeader*>(Read(current, sizeof(NoteHeader)));
+
+				uint32_t name_size_aligned = note_header->name_size;
+				if (name_size_aligned % 4 != 0)
+					name_size_aligned += 4 - name_size_aligned % 4;
+
+				uint32_t content_size_aligned = note_header->content_size;
+				if (content_size_aligned % 4 != 0)
+					content_size_aligned += 4 - content_size_aligned % 4;
+
+				if (note_header->type == 0x46494c45)
+				{
+					if (note_header->content_size < sizeof(NT_File_Header))
+					{
+						throw;
+					}
+
+					std::byte* note_data = Read(current + sizeof(NoteHeader) + name_size_aligned, note_header->content_size);
+
+					NT_File_Header* nt_file_header = reinterpret_cast<NT_File_Header*>(note_data);
+
+					// Check room for elements
+					if (note_header->content_size < (sizeof(NT_File_Header) + sizeof(NT_File_Element) * nt_file_header->count))
+					{
+						throw;
+					}
+
+					NT_File_Element* elements = reinterpret_cast<NT_File_Element*>(note_data + sizeof(NT_File_Header));
+
+					// The rest of the buffer is our strings separated by null bytes
+					char* strings_begin = reinterpret_cast<char*>(note_data + sizeof(NT_File_Header) + sizeof(NT_File_Element) * nt_file_header->count);
+					char* strings_end = reinterpret_cast<char*>(note_data + note_header->content_size);
+					char search[] = "libbyond.so";
+
+					auto match = std::search(strings_begin, strings_end, std::begin(search), std::end(search));
+
+					std::vector<std::pair<uint32_t, uint32_t>> results;
+
+					while (match != strings_end)
+					{
+						uint32_t index = std::count(strings_begin, match, '\0');
+
+						if (index >= nt_file_header->count)
+						{
+							throw;
+						}
+
+						results.push_back({elements[index].start, elements[index].end});
+						match = std::search(match + 1, strings_end, std::begin(search), std::end(search));
+					}
+
+					return results;
+				}
+
+				current += sizeof(NoteHeader) + name_size_aligned + content_size_aligned;
+			}
 		}
+
+		return std::nullopt;
 	}
 
 private:
