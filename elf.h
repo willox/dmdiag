@@ -10,6 +10,12 @@
 
 // Mmmm
 
+class ELF_File;
+extern ELF_File* current_elf;
+
+template<typename T>
+class VPtr;
+
 class ELF_File
 {
 private:
@@ -141,6 +147,12 @@ public:
 		{
 			std::byte* ptr = Read(header->sectionheader_offset + header->sectionheader_entry_size * i, header->sectionheader_entry_size);
 			section_headers.push_back(reinterpret_cast<SectionHeader*>(ptr));
+		}
+
+		auto found_regions = FindRegions();
+		if (found_regions)
+		{
+			regions = *found_regions;
 		}
 
 		return;
@@ -277,10 +289,103 @@ public:
 		return std::nullopt;
 	}
 
+	template<typename T>
+	T* Scan(const char* signature, size_t offset)
+	{
+		for (auto region : regions)
+		{
+			size_t length = region.second - region.first;
+
+			char* begin = reinterpret_cast<char*>(Translate(region.first, length));
+			char* end = begin + length;
+
+			size_t loc = 0;
+
+			// i'm pretty sure this could miss a result in certain cases
+			for (char* ptr = begin; ptr < end; ptr++) {
+				if (signature[loc] == '?' || signature[loc] == *ptr) {
+					if (signature[loc + 1] == '\0') {
+						return reinterpret_cast<T*>(ptr - loc + offset); // TODO: Check size and offset
+					}
+
+					loc++;
+				} else {
+					loc = 0;
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
 private:
 	std::vector<std::byte> buffer;
 
 	Header* header;
 	std::vector<ProgramHeader*> program_headers;
 	std::vector<SectionHeader*> section_headers;
+
+	std::vector<std::pair<uint32_t, uint32_t>> regions;
 };
+
+template<typename T>
+class VPtr
+{
+public:
+	VPtr(uint32_t ptr)
+		: ptr(ptr)
+	{}
+
+	bool operator==(std::nullptr_t rhs)
+	{
+		return ptr == 0;
+	}
+
+	template<typename T2>
+	bool operator==(const VPtr<T2> rhs) const
+	{
+		return ptr == rhs.ptr;
+	}
+
+	template<typename T2>
+	bool operator!=(const VPtr<T2> rhs) const
+	{
+		return ptr != rhs.ptr;
+	}
+
+	T& operator*()
+	{
+		if (ptr == 0) // https://www.youtube.com/watch?v=bLHL75H_VEM
+			throw;
+
+		return *reinterpret_cast<T*>(current_elf->Translate(ptr, sizeof(T)));
+	}
+
+	T* operator->()
+	{
+		return reinterpret_cast<T*>(current_elf->Translate(ptr, sizeof(T)));
+	}
+
+	T& operator[](size_t index)
+	{
+		if (ptr == 0) // https://www.youtube.com/watch?v=bLHL75H_VEM
+			throw;
+
+		return *reinterpret_cast<T*>(current_elf->Translate(ptr + index * sizeof(T), sizeof(T)));
+	}
+
+	operator bool()
+	{
+		return ptr != 0;
+	}
+
+	T* get()
+	{
+		return reinterpret_cast<T*>(current_elf->Translate(ptr, sizeof(T)));
+	}
+
+private:
+	uint32_t ptr;
+};
+
+static_assert(sizeof(VPtr<uint32_t>) == sizeof(uint32_t));

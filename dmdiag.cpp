@@ -2,6 +2,8 @@
 #include "internal_types.h"
 #include "elf.h"
 
+ELF_File* current_elf = nullptr;
+
 static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.80099";
 
 static const char* Scan(const char* base, size_t length, const char* signature, size_t offset)
@@ -27,38 +29,58 @@ static const char* Scan(const char* base, size_t length, const char* signature, 
 int main(int argc, char** argv)
 {
 	ELF_File fh = ELF_File::Parse(dump_path);
+	current_elf = &fh;
 
-	auto ranges = fh.FindRegions();
 
-	for (auto range : *ranges)
+	auto* result = fh.Scan<VPtr<dm::StringTable>>("\x55\x89\xe5\x83\xec?\x8b\x45?\x39\x05????\x76?\x8b\x15????\x8b\x04?\x85\xc0", 19);
+
+
+	std::vector<const char*> strings;
+	if (result)
 	{
-		size_t length = range.second - range.first;
-		char* begin = reinterpret_cast<char*>(fh.Translate(range.first, length));
+		
 
-		const char* result = Scan(begin, length, "\x55\x89\xe5\x83\xec?\x8b\x45?\x39\x05????\x76?\x8b\x15????\x8b\x04?\x85\xc0", 19);
+		dm::StringTable& string_table = **result;
 
-		if (result)
+		for (uint32_t i = 0; i < string_table.size; i++)
 		{
-			std::vector<const char*> strings;
-
-			uint32_t stringtable_ptr_ptr_ptr = *reinterpret_cast<const uint32_t*>(result);
-			uint32_t strings_count = *reinterpret_cast<uint32_t*>(fh.Translate(stringtable_ptr_ptr_ptr + 4, 4));
-
-			uint32_t stringtable_ptr_array = *reinterpret_cast<uint32_t*>(fh.Translate(stringtable_ptr_ptr_ptr, 4));
-
-			for (uint32_t i = 0; i < strings_count; i++)
-			{
-				uint32_t stringtable_entry = *reinterpret_cast<uint32_t*>(fh.Translate(stringtable_ptr_array + i * 4, 4));
-				dm::stringtable_entry* entry = reinterpret_cast<dm::stringtable_entry*>(fh.Translate(stringtable_entry, sizeof(stringtable_entry)));
-
-				strings.push_back(reinterpret_cast<const char*>(fh.Translate(entry->ptr, 2)));
-			}
-
-			break;
+			VPtr<dm::String> entry = string_table.strings[i];
+			strings.push_back(entry->data.get());
 		}
 	}
 
-	auto test = fh.Translate(0xf7952010, 4);
+	auto* some_globals_ptr = fh.Scan<VPtr<VPtr<dm::SomeGlobals>>>("\xA1????\x89\x54\x24?\x8B\x40?\x89\x04\x24\xE8????\x8B\x8D????", 1);
+	dm::SomeGlobals& some_globals = ***some_globals_ptr;
+
+	auto* mob_table_ptr = fh.Scan<VPtr<dm::MobTable>>("\xA1????\x8B\x0C?\x85\xC9\x0F\x85????\x31\xC0\xE9?????\x66\x3B\x71?", 1);
+
+	if (mob_table_ptr)
+	{
+		dm::MobTable& mob_table = **mob_table_ptr;
+
+		for (uint32_t i = 0; i < mob_table.length; i++)
+		{
+			if (mob_table.elements[i] == nullptr)
+				continue;
+
+			dm::Mob& mob = *mob_table.elements[i];
+
+			const char* name = strings[some_globals.mob_fields[mob.mob_fields_index]->name_id];
+
+			continue;
+			/*
+			dm::Variable* vars = mob.variables.elements.get();
+
+			for (uint32_t j = 0; j < mob.variables.count; j++)
+			{
+				dm::Variable& var = vars[j];
+
+				const char* name = strings[var.name_index];
+				continue;
+			}
+			*/
+		}
+	}
 
 	return 0;
 }
