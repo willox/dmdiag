@@ -112,6 +112,13 @@ struct String
 
 static_assert(sizeof(String) == 28);
 
+struct StringRef
+{
+	uint32_t string_index;
+};
+
+static_assert(sizeof(StringRef) == 4);
+
 struct StringTable
 {
 	VPtr<VPtr<String>> strings;
@@ -183,6 +190,75 @@ struct SomeGlobals
 	VPtr<VPtr<MobFields>> mob_fields;
 	uint32_t mob_fields_count;
 };
+
+struct ExecutionContext;
+
+struct ProcConstants
+{
+	int proc_id;
+	int unknown1;
+	Value usr;
+	Value src;
+	union
+	{
+		VPtr<ExecutionContext> context;
+		VPtr<ProcConstants> next; // When we're part of the global `constants_freelist` linked list, this is the next element
+	};
+	union
+	{
+		int argslist_id;
+	};
+
+	int unknown4; //some callback thing
+	union
+	{
+		int unknown5;
+		int extended_profile_id;
+	};
+	union
+	{
+		int arg_count;
+	};
+	VPtr<Value> args;
+	char unknown6[0x58];
+	int time_to_resume;
+};
+
+struct ExecutionContext
+{
+	VPtr<ProcConstants> constants;
+	VPtr<ExecutionContext> parent_context;
+	std::uint32_t dbg_proc_file;
+	std::uint32_t dbg_current_line;
+	VPtr<std::uint32_t> bytecode;
+	std::uint16_t current_opcode;
+	char test_flag;
+	char unknown1;
+	Value cached_datum;
+	char unknown2[16];
+	Value dot;
+	VPtr<Value> local_variables;
+	VPtr<Value> stack;
+	std::uint16_t local_var_count;
+	std::uint16_t stack_size;
+	std::int32_t unknown; //callback something
+	VPtr<Value> current_iterator;
+	std::uint32_t iterator_allocated;
+	std::uint32_t iterator_length;
+	std::uint32_t iterator_index;
+	std::int32_t another_unknown2;
+	char unknown4[3];
+	char iterator_filtered_type;
+	char unknown5;
+	char iterator_unknown;
+	char unknown6;
+	std::uint32_t infinite_loop_count;
+	char unknown7[2];
+	bool paused;
+	char unknown8[51];
+};
+
+static const size_t y = sizeof(ProcConstants);
 
 }
 

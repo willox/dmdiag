@@ -45,9 +45,19 @@ int main(int argc, char** argv)
 		for (uint32_t i = 0; i < string_table.size; i++)
 		{
 			VPtr<dm::String> entry = string_table.strings[i];
+
+			if (strcmp("gaslist", entry->data.get()) == 0)
+			{
+				const char* x = entry->data.get();
+				continue;
+			}
+
 			strings.push_back(entry->data.get());
 		}
 	}
+
+	auto* current_execution_context = fh.Scan<VPtr<VPtr<dm::ExecutionContext>>>("\x8B\x0D????\x8B\x09\x8B\x51?\x8B\x41?\x8B\x8D????\x89\x7C\x24?", 2);
+	dm::ExecutionContext& context = ***current_execution_context;
 
 	auto* some_globals_ptr = fh.Scan<VPtr<VPtr<dm::SomeGlobals>>>("\xA1????\x89\x54\x24?\x8B\x40?\x89\x04\x24\xE8????\x8B\x8D????", 1);
 	dm::SomeGlobals& some_globals = ***some_globals_ptr;
@@ -65,7 +75,7 @@ int main(int argc, char** argv)
 
 			dm::Mob& mob = *mob_table.elements[i];
 
-			const char* name = strings[some_globals.mob_fields[mob.mob_fields_index]->name_id];
+			auto* data= some_globals.mob_fields[mob.mob_fields_index].get();
 
 			continue;
 			/*
