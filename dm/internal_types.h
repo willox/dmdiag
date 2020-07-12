@@ -1,8 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-
-#include "elf.h"
+#include "VPtr.h"
 
 namespace dm
 {
@@ -82,23 +81,6 @@ enum class DataType : uint8_t
 	LIST_IMAGE_VIS_CONTENTS = 0x54,
 };
 
-struct Value
-{
-	DataType type;
-	union
-	{
-		uint32_t value_int;
-		uint32_t value_float;
-	};
-};
-
-static_assert(sizeof(Value) == 8);
-
-enum class DefaultStrings
-{
-	
-};
-
 struct String
 {
 	VPtr<char> data;
@@ -112,12 +94,27 @@ struct String
 
 static_assert(sizeof(String) == 28);
 
-struct StringRef
+template<typename T>
+struct Ref
 {
-	uint32_t string_index;
+	uint32_t index;
+	T* get();
+
+	// Only for T = String
+	const char* string();
+
+	bool operator==(const Ref<T>& rhs) const
+	{
+		return index == rhs.index;
+	}
+
+	bool operator!=(const Ref<T>& rhs) const
+	{
+		return index != rhs.index;
+	}
 };
 
-static_assert(sizeof(StringRef) == 4);
+static_assert(sizeof(Ref<String>) == 4);
 
 struct StringTable
 {
@@ -127,11 +124,59 @@ struct StringTable
 
 static_assert(sizeof(StringTable) == 8);
 
+struct Value
+{
+	DataType type;
+	union
+	{
+		float _number;
+		Ref<String> _string;
+	};
+};
+
+static_assert(sizeof(Value) == 8);
+
+struct Misc;
+
+struct ObjPath
+{
+	char unk_0[0x54];
+	Ref<Misc> global_vars;
+	uint32_t unk_1;
+	Ref<Misc> initial_vars;
+	char unk_2[0x4];
+};
+
+static_assert(sizeof(ObjPath) == 100);
+
+struct ObjPathTable
+{
+	VPtr<ObjPath> elements;
+	uint32_t count;
+};
+ 
+static_assert(sizeof(ObjPathTable) == 8);
+
+// TODO: What really is this?
+struct MobType
+{
+	Ref<ObjPath> obj_path;
+	char unk_0[0xC];
+};
+
+static_assert(sizeof(MobType) == 16);
+
+struct MobTypeTable
+{
+	VPtr<MobType> elements;
+	uint32_t count;
+};
+
 // TODO: Might actually be more specific (VariableTableEntry?)
 struct Variable
 {
 	uint32_t unk_0;
-	uint32_t name_index; // TODO: retype?
+	Ref<String> name;
 	Value value;
 };
 
@@ -139,9 +184,12 @@ static_assert(sizeof(Variable) == 16);
 
 struct VariableTable
 {
+	// TODO: Is this sorted?
 	VPtr<Variable> elements;
 	uint16_t count;
 	uint16_t capacity;
+
+	Value* GetField(Ref<String> key);
 };
 
 static_assert(sizeof(VariableTable) == 8);
@@ -157,12 +205,12 @@ struct Mob
 	VPtr<uint32_t> unk_5;
 	char unk_6[0x8];
 	uint32_t mob_fields_index;
-	char unk_7[0x54];
-	VPtr<uint32_t> unk_8;
-	char unk_9[0x10];
+	char unk_7[0x48];
+	Ref<MobType> mob_type;
+	char unk_8[0x8];
+	VPtr<uint32_t> unk_9;
+	char unk_10[0x10];
 };
-
-static const size_t x = offsetof(Mob, mob_fields_index);
 
 static_assert(sizeof(Mob) == 188);
 
@@ -180,8 +228,8 @@ static_assert(sizeof(MobTable) == 8);
 struct MobFields
 {
 	char unk_0[0x1c];
-	uint32_t name_id;
-	uint32_t desc_id;
+	Ref<String> name_id;
+	Ref<String> desc_id;
 };
 
 struct SomeGlobals
@@ -228,10 +276,10 @@ struct ExecutionContext
 {
 	VPtr<ProcConstants> constants;
 	VPtr<ExecutionContext> parent_context;
-	std::uint32_t dbg_proc_file;
-	std::uint32_t dbg_current_line;
-	VPtr<std::uint32_t> bytecode;
-	std::uint16_t current_opcode;
+	Ref<String> dbg_proc_file;
+	Ref<String> dbg_current_line;
+	VPtr<uint32_t> bytecode;
+	uint16_t current_opcode;
 	char test_flag;
 	char unknown1;
 	Value cached_datum;
@@ -239,26 +287,78 @@ struct ExecutionContext
 	Value dot;
 	VPtr<Value> local_variables;
 	VPtr<Value> stack;
-	std::uint16_t local_var_count;
-	std::uint16_t stack_size;
-	std::int32_t unknown; //callback something
+	uint16_t local_var_count;
+	uint16_t stack_size;
+	int32_t unknown; //callback something
 	VPtr<Value> current_iterator;
-	std::uint32_t iterator_allocated;
-	std::uint32_t iterator_length;
-	std::uint32_t iterator_index;
-	std::int32_t another_unknown2;
+	uint32_t iterator_allocated;
+	uint32_t iterator_length;
+	uint32_t iterator_index;
+	uint32_t another_unknown2;
 	char unknown4[3];
 	char iterator_filtered_type;
 	char unknown5;
 	char iterator_unknown;
 	char unknown6;
-	std::uint32_t infinite_loop_count;
+	uint32_t infinite_loop_count;
 	char unknown7[2];
 	bool paused;
 	char unknown8[51];
 };
 
-static const size_t y = sizeof(ProcConstants);
+struct InitialVariable
+{
+	Ref<String> name;
+	uint32_t unk_0;
+	Value value;
+};
+
+static_assert(sizeof(InitialVariable) == 16);
+
+struct InitialVariableTable
+{
+	uint16_t count;
+	VPtr<InitialVariable> variables;
+	uint32_t unk_0;
+};
+
+static_assert(sizeof(InitialVariableTable) == 12);
+
+struct GlobalVariable
+{
+	uint32_t global_value_index;
+	uint8_t flags;
+};
+
+struct GlobalVariableTable
+{
+	uint16_t count;
+	VPtr<GlobalVariable> variables;
+	uint32_t unk0;
+};
+
+struct Misc
+{
+	union
+	{
+		InitialVariableTable initial_variable_table;
+		GlobalVariableTable global_variable_table;
+		// proc bytecode
+	};
+};
+
+static_assert(sizeof(Misc) == 12);
+
+struct MiscTable
+{
+	VPtr<VPtr<Misc>> elements;
+	uint32_t count;
+};
+
+static_assert(sizeof(MiscTable) == 8);
+
+
+
 
 }
 

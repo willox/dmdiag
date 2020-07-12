@@ -9,4 +9,6 @@ if(WIN32)
 	add_definitions(-DNOMINMAX)
 endif()
 
-add_executable(dmdiag internal_types.h dmdiag.h dmdiag.cpp elf.h)
+add_executable(dmdiag dm/internal_types.cpp dm/internal_types.h dmdiag.h dmdiag.cpp elf.h elf.cpp dm/State.h dm/State.cpp dm/VPtr.cpp dm/VPtr.h)
+
+include_directories(dmdiag .)

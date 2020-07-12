@@ -1,0 +1,47 @@
+#include "internal_types.h"
+#include "State.h"
+
+namespace dm
+{
+
+template<>
+const char* Ref<String>::string()
+{
+	return current_state->GetString(index);
+};
+
+template<>
+ObjPath* Ref<ObjPath>::get()
+{
+	return current_state->GetObjPath(index);
+};
+
+template<>
+MobType* Ref<MobType>::get()
+{
+	return current_state->GetMobType(index);
+};
+
+template<>
+Misc* Ref<Misc>::get()
+{
+	return current_state->GetMisc(index);
+}
+
+Value* VariableTable::GetField(Ref<String> key)
+{
+	Variable* cached_elements = elements.get();
+
+	for (uint32_t i = 0; i < count; i++)
+	{
+		if (cached_elements[i].name == key)
+		{
+			return &cached_elements[i].value;
+		}
+	}
+
+	return nullptr;
+}
+
+}
+
