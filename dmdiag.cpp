@@ -13,21 +13,15 @@ int main(int argc, char** argv)
 	{
 		auto* mob = state.GetMob(i);
 
-		auto* mobtype = mob->mob_type.get();
-		auto* obj_path = mobtype->obj_path.get();
-		auto* initial_vars = obj_path->initial_vars.get();
+		dm::Ref<dm::String>* str = state.GetStringRef("name");
+		if (str == nullptr)
+			continue;
 
-		for (uint32_t var = 0; var < initial_vars->initial_variable_table.count; var++)
+		auto var = mob->GetField(*str);
+		if (var)
 		{
-			auto& x = initial_vars->initial_variable_table.variables[var];
-
-			const char* name = x.name.string();
-			dm::Value& val = x.value;
-
 			continue;
 		}
-
-		continue;
 	}
 
 	return 0;

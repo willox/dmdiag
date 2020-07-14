@@ -94,6 +94,12 @@ struct String
 
 static_assert(sizeof(String) == 28);
 
+// Just a String but indexed from another container
+struct VarName : public String
+{};
+
+static_assert(sizeof(VarName) == 28);
+
 template<typename T>
 struct Ref
 {
@@ -141,7 +147,7 @@ struct Misc;
 struct ObjPath
 {
 	char unk_0[0x54];
-	Ref<Misc> global_vars;
+	Ref<Misc> var_declarations;
 	uint32_t unk_1;
 	Ref<Misc> initial_vars;
 	char unk_2[0x4];
@@ -194,6 +200,8 @@ struct VariableTable
 
 static_assert(sizeof(VariableTable) == 8);
 
+struct MobFields;
+
 struct Mob
 {
 	char unk_0[0x24];
@@ -204,12 +212,16 @@ struct Mob
 	VPtr<uint32_t> unk_4;
 	VPtr<uint32_t> unk_5;
 	char unk_6[0x8];
-	uint32_t mob_fields_index;
+	Ref<MobFields> fields;
 	char unk_7[0x48];
 	Ref<MobType> mob_type;
 	char unk_8[0x8];
 	VPtr<uint32_t> unk_9;
 	char unk_10[0x10];
+
+	Value* GetField(Ref<String> name);
+	Value* GetInitialField(Ref<String> name);
+	Value* GetGlobalField(Ref<String> name);
 };
 
 static_assert(sizeof(Mob) == 188);
@@ -227,10 +239,102 @@ static_assert(sizeof(MobTable) == 8);
 
 struct MobFields
 {
+	enum class Flags : uint8_t
+	{
+		// wrong for bigger size?
+		Density = 0x2,
+		Visibility = 0x4, 
+	};
+
 	char unk_0[0x1c];
-	Ref<String> name_id;
-	Ref<String> desc_id;
+	Ref<String> name;
+	Ref<String> desc;
+	Ref<String> suffix;
+	uint32_t unk_1;
+	Ref<String> text;
+	uint32_t icon;
+	Ref<String> icon_state;
+	uint32_t unk_2;
+	uint32_t unk_3;
+	uint32_t unk_4;
+	uint32_t unk_5;
+	Flags flags; // how big
+
+	/*
+	icon_state // 2c
+	visibility // 2d
+	luminosity // 2e
+	opacity // 2f
+	density // 30
+	verbs // 31
+	loc // 32
+	x // 33
+	y // 34
+	z // 35
+	dir // 3a
+	gender // 43
+	sight // 44
+	client // 45
+	key // 46
+	ckey // 47
+	group // 48
+	contents // 49
+	tag // 55
+	vars // 5e
+	overlays // 62
+	underlays // 63
+	layer // 73
+	parent_type // 82
+	mouse_over_pointer // 94
+	mouse_drag_pointer // 95
+	mouse_drop_pointer // 96
+	mouse_drop_zone // 97
+	animate_movement // a5
+	screen_loc // a9
+	see_in_dark // b3
+	infra_luminosity // b4
+	invisibility // b5
+	see_invisible // b6
+	see_infrared // b7
+	mouse_opacity // b8
+	pixel_x // bb
+	pixel_y // bc
+	pixel_step_size // bd
+	pixel_z // da
+	_override // db
+	bounds // dd
+	locs // de
+	step_x // df
+	step_y // e0
+	step_size // e1
+	bound_x // e2
+	bound_y // e3
+	bound_width // e4
+	bound_height // e5
+	glide_size // eb
+	maptext // ec
+	maptext_width // ed
+	maptext_height // ee
+	transform // f0
+	alpha // f1
+	color // f2
+	blend_mode // fe
+	appearance // 106
+	maptext_x // 10b
+	maptext_y // 10c
+	plane // 10d
+	appearance_flags // 10e
+	pixel_w // 117
+	vis_contents // 119
+	vis_locs // 11a
+	filters // 11c
+	render_source // 129
+	render_target // 12a
+	vis_flags // 12b
+	*/
 };
+
+static const size_t x = offsetof(MobFields, icon_state);
 
 struct SomeGlobals
 {
@@ -309,7 +413,14 @@ struct ExecutionContext
 struct InitialVariable
 {
 	Ref<String> name;
-	uint32_t unk_0;
+
+	// Does anything use these? They exist.
+	union
+	{
+		Ref<VarName> _name;
+		Ref<Value> _value;
+	};
+
 	Value value;
 };
 
@@ -317,24 +428,58 @@ static_assert(sizeof(InitialVariable) == 16);
 
 struct InitialVariableTable
 {
-	uint16_t count;
+private:
+	uint16_t count_mul2;
+public:
 	VPtr<InitialVariable> variables;
 	uint32_t unk_0;
+
+	uint16_t count() { return count_mul2 / 2; }
 };
 
 static_assert(sizeof(InitialVariableTable) == 12);
 
-struct GlobalVariable
+struct VarDeclaration
 {
-	uint32_t global_value_index;
-	uint8_t flags;
+private:
+	enum class Flags : uint8_t
+	{
+		Global = 0x01,
+		Temporary = 0x04,
+	};
+
+public:
+	union
+	{
+		Ref<VarName> name;
+		Ref<Value> value;
+	};
+
+	Flags flags;
+
+	bool isGlobal()
+	{
+		return (uint8_t)flags & (uint8_t)Flags::Global;
+	}
+
+	bool isTemporary()
+	{
+		return (uint8_t)flags & (uint8_t)Flags::Temporary;
+	}
 };
 
-struct GlobalVariableTable
+static_assert(sizeof(VarDeclaration) == 8);
+
+// TODO: Name sort of needs validation
+struct VarDeclarationTable
 {
-	uint16_t count;
-	VPtr<GlobalVariable> variables;
+private:
+	uint16_t count_mul2;
+public:
+	VPtr<VarDeclaration> variables;
 	uint32_t unk0;
+
+	uint16_t count() { return count_mul2 / 2; }
 };
 
 struct Misc
@@ -342,7 +487,7 @@ struct Misc
 	union
 	{
 		InitialVariableTable initial_variable_table;
-		GlobalVariableTable global_variable_table;
+		VarDeclarationTable var_declaration_table;
 		// proc bytecode
 	};
 };

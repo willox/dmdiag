@@ -59,6 +59,7 @@ public:
 		return ptr != 0;
 	}
 
+	// TODO: Should provide a count for when the ptr is expected to be an array
 	T* get()
 	{
 		if (ptr == 0) // https://www.youtube.com/watch?v=bLHL75H_VEM

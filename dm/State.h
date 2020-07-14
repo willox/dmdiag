@@ -3,6 +3,7 @@
 #include "internal_types.h"
 #include "elf.h"
 #include <vector>
+#include <map>
 
 class ELF_File;
 
@@ -18,8 +19,11 @@ public:
 	State(const char* path);
 
 	const char* GetString(uint32_t index);
+	Ref<String>* GetStringRef(const char* str);
 	Mob* GetMob(uint32_t index);
 	MobType* GetMobType(uint32_t index);
+	const char* GetVarName(uint32_t index);
+	Value& GetValue(uint32_t index);
 	ObjPath* GetObjPath(uint32_t index);
 	Misc* GetMisc(uint32_t index);
 
@@ -35,12 +39,13 @@ public:
 	ExecutionContext* _current_execution_context;
 	MobTable* _mob_table;
 	MobTypeTable* _mobtype_table;
-	Ref<String>* _names_table;
-	Value* _global_values_table;
+	Ref<String>* _varname_table;
+	Value* _value_table;
 	ObjPathTable* _obj_path_table;
 	MiscTable* _misc_table;
 
 	std::vector<const char*> _strings;
+	std::map<std::string, Ref<String>> _string_refs;
 };
 
 }

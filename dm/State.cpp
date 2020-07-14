@@ -20,8 +20,8 @@ State::State(const char* path)
 	auto* ppCurrentExecutionContext = _file.Scan<VPtr<VPtr<dm::ExecutionContext>>>("\x8B\x0D????\x8B\x09\x8B\x51?\x8B\x41?\x8B\x8D????\x89\x7C\x24?", 2);
 	auto* pMobTable = _file.Scan<VPtr<MobTable>>("\xA1????\x8B\x0C?\x85\xC9\x0F\x85????\x31\xC0\xE9?????\x66\x3B\x71?", 1);
 	auto* pMobTypeTable = _file.Scan<VPtr<MobTypeTable>>("\x3B\x15????\x0F\x83????\xC1\xE2\x04\x03\x15????\x0F\x84????", 17);
-	auto* ppNamesTable = _file.Scan<VPtr<VPtr<Ref<String>>>>("\xA1????\x8B\x04?\x89\x34\x24\x89\x44\x24?\xE8????\x8B\x55?\x8B\x45?\x83\xEC\x04\x89\x54\x24?\x8B\x55?\x89\x44\x24?\x8B\x45?\x89\x54\x24?\x8B\x55?\x89\x04\x24\x89\x54\x24?\xE8????\x66\x3B\x3B", 1);
-	auto* ppGlobalValuesTable = _file.Scan<VPtr<VPtr<Value>>>("\x03\x35????\x89\x44\x24?\x89\x54\x24?\x89\x34\x24\xE8????\xB8\x01\x00\x00\x00", 2);
+	auto* ppVarNameTable = _file.Scan<VPtr<VPtr<Ref<String>>>>("\xA1????\x8B\x04?\x89\x34\x24\x89\x44\x24?\xE8????\x8B\x55?\x8B\x45?\x83\xEC\x04\x89\x54\x24?\x8B\x55?\x89\x44\x24?\x8B\x45?\x89\x54\x24?\x8B\x55?\x89\x04\x24\x89\x54\x24?\xE8????\x66\x3B\x3B", 1);
+	auto* ppValueTable = _file.Scan<VPtr<VPtr<Value>>>("\x03\x35????\x89\x44\x24?\x89\x54\x24?\x89\x34\x24\xE8????\xB8\x01\x00\x00\x00", 2);
 	auto* pObjPathTable = _file.Scan<VPtr<ObjPathTable>>("\x8B\x1D????\x01\xD9\x89\x4D?\x8B\x0D????\x8D\x04?\x89\x45?\x8B\x5D?", 2);
 	auto* pMiscTable = _file.Scan<VPtr<MiscTable>>("\x8B\x15????\x8B\x04?\x85\xC0\x0F\x84????\x8B\x78?\x0F\xB7\x00\x66\x85\xC0", 2);
 
@@ -46,14 +46,14 @@ State::State(const char* path)
 		_mobtype_table = pMobTypeTable->get();
 	}
 
-	if (ppNamesTable)
+	if (ppVarNameTable)
 	{
-		_names_table = (*ppNamesTable)->get();
+		_varname_table = (*ppVarNameTable)->get();
 	}
 
-	if (ppGlobalValuesTable)
+	if (ppValueTable)
 	{
-		_global_values_table = (*ppGlobalValuesTable)->get();
+		_value_table = (*ppValueTable)->get();
 	}
 
 	if (pObjPathTable)
@@ -76,7 +76,10 @@ void State::LoadStrings()
 	{
 		VPtr<dm::String> entry = _string_table->strings[i];
 		_strings[i] = entry->data.get();
+		_string_refs[entry->data.get()] = Ref<String>{i};
 	}
+
+
 }
 
 const char* State::GetString(uint32_t index)
@@ -87,6 +90,17 @@ const char* State::GetString(uint32_t index)
 	}
 
 	return _strings[index];
+}
+
+Ref<String>* State::GetStringRef(const char* string)
+{
+	auto& x = _string_refs.find({string});
+	if (x != _string_refs.end())
+	{
+		return &x->second;
+	}
+
+	return nullptr;
 }
 
 Mob* State::GetMob(uint32_t index)
@@ -107,6 +121,30 @@ MobType* State::GetMobType(uint32_t index)
 	}
 
 	return &_mobtype_table->elements[index];
+}
+
+const char* State::GetVarName(uint32_t index)
+{
+/*
+	if (index >= _varname_table->count)
+	{
+		return nullptr;
+	}
+*/
+
+	return _varname_table[index].string();
+}
+
+Value& State::GetValue(uint32_t index)
+{
+	/*
+	if (index >= _value_table->count)
+	{
+	return nullptr;
+	}
+	*/
+
+	return _value_table[index];
 }
 
 ObjPath* State::GetObjPath(uint32_t index)
