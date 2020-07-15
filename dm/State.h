@@ -26,7 +26,7 @@ public:
 	Value& GetValue(uint32_t index);
 	ObjPath* GetObjPath(uint32_t index);
 	Misc* GetMisc(uint32_t index);
-
+	MobFields* GetMobFields(uint32_t index);
 
 	std::byte* Translate(uint32_t pointer, uint32_t size);
 
@@ -43,6 +43,7 @@ public:
 	Value* _value_table;
 	ObjPathTable* _obj_path_table;
 	MiscTable* _misc_table;
+	SomeGlobals* _someglobals;
 
 	std::vector<const char*> _strings;
 	std::map<std::string, Ref<String>> _string_refs;

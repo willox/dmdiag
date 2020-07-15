@@ -132,12 +132,29 @@ static_assert(sizeof(StringTable) == 8);
 
 struct Value
 {
+	Value()
+		: type(DataType::NULL_D)
+		, _number(0.f)
+	{}
+
+	Value(float num)
+		: type(DataType::NUMBER)
+		, _number(num)
+	{}
+
+	Value(Ref<String> str)
+		: type(DataType::STRING)
+		, _string(str)
+	{}
+
 	DataType type;
 	union
 	{
 		float _number;
 		Ref<String> _string;
 	};
+
+	static const Value Null;
 };
 
 static_assert(sizeof(Value) == 8);
@@ -219,6 +236,37 @@ struct Mob
 	VPtr<uint32_t> unk_9;
 	char unk_10[0x10];
 
+	Value getName();
+	Value getDesc();
+	Value getSuffix();
+	Value getScreenLoc();
+	Value getText();
+	Value getIcon();
+	Value getIconState();
+	Value getDensity();
+	Value getOpacity();
+	Value getGender();
+	Value getMouseDropZone();
+	Value getAnimateMovement();
+	Value getMouseOpacity();
+	Value getOverride();
+	Value getInvisibility();
+	Value getInfraLuminosity();
+	Value getLuminosity();
+	Value getMapText();
+	Value getMapTextX();
+	Value getMapTextY();
+	Value getMapTextWidth();
+	Value getMapTextHeight();
+	Value getMouseOverPointer();
+	Value getMouseDragPointer();
+	Value getMouseDropPointer();
+	Value getRenderSource();
+	Value getRenderTarget();
+	Value getVisFlags();
+
+
+
 	Value* GetField(Ref<String> name);
 	Value* GetInitialField(Ref<String> name);
 	Value* GetGlobalField(Ref<String> name);
@@ -239,18 +287,25 @@ static_assert(sizeof(MobTable) == 8);
 
 struct MobFields
 {
-	enum class Flags : uint8_t
+	enum class Flags : uint32_t
 	{
-		// wrong for bigger size?
-		Density = 0x2,
-		Visibility = 0x4, 
+		//Density = 0x2,
+		//Visibility = 0x4, // what
+		// Opacity
+		// Gender
+
+		// mouse_drop_zone
+		// animate_movement
+		// mouse_opacity_mask
+		// override
+
 	};
 
 	char unk_0[0x1c];
 	Ref<String> name;
 	Ref<String> desc;
 	Ref<String> suffix;
-	uint32_t unk_1;
+	Ref<String> screen_loc;
 	Ref<String> text;
 	uint32_t icon;
 	Ref<String> icon_state;
@@ -258,7 +313,30 @@ struct MobFields
 	uint32_t unk_3;
 	uint32_t unk_4;
 	uint32_t unk_5;
-	Flags flags; // how big
+	Flags flags; // todo
+	uint8_t unk_7;
+	uint8_t invisibility;
+	uint8_t infra_luminosity;
+	uint8_t luminosity;
+	uint32_t unk_8;
+	uint32_t unk_9;
+	uint32_t unk_10;
+	uint32_t layer;
+	Ref<String> maptext;
+	uint16_t maptext_x; // (0x64);
+	uint16_t maptext_y; // (0x66);
+	uint16_t maptext_width; // (0x68) (special behaviour)
+	uint16_t maptext_height; // (0x6a) (special behaviour)
+	Value mouse_over_pointer; // (0x6c)
+	Value mouse_drag_pointer; // (0x74)
+	Value mouse_drop_pointer; // (0x7c)
+	char unk_11[0x34];
+	Ref<String> render_source; // (0xb8)
+	Ref<String> render_target; // (0xbc)
+	uint16_t vis_flags; // (0xc0)
+
+	// TODO: transform is in here somewhere
+	// TODO: size unknown
 
 	/*
 	icon_state // 2c
@@ -267,6 +345,7 @@ struct MobFields
 	opacity // 2f
 	density // 30
 	verbs // 31
+
 	loc // 32
 	x // 33
 	y // 34
@@ -334,14 +413,15 @@ struct MobFields
 	*/
 };
 
-static const size_t x = offsetof(MobFields, icon_state);
-
 struct SomeGlobals
 {
 	char unk_0[0x40];
 	VPtr<VPtr<MobFields>> mob_fields;
 	uint32_t mob_fields_count;
 };
+
+static const size_t x = offsetof(SomeGlobals, mob_fields);
+
 
 struct ExecutionContext;
 
