@@ -22,6 +22,7 @@ public:
 	Ref<String>* GetStringRef(const char* str);
 	Mob* GetMob(uint32_t index);
 	MobType* GetMobType(uint32_t index);
+	Ref<MobType> FindMobType(Ref<ObjPath> path);
 	const char* GetVarName(uint32_t index);
 	Value& GetValue(uint32_t index);
 	ObjPath* GetObjPath(uint32_t index);

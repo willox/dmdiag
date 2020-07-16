@@ -4,6 +4,120 @@
 namespace dm
 {
 
+Value Mob::getType()
+{
+	return Value{mob_type};
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getVerbs()
+{
+	return Value::Null;
+}
+
+Value Mob::getLoc()
+{
+	return loc;
+}
+
+Value Mob::getX()
+{
+	if (loc.type != DataType::TURF)
+		return {0.f};
+
+	// TODO: Annoying logic
+	return Value::Null;
+}
+
+Value Mob::getY()
+{
+	if (loc.type != DataType::TURF)
+		return {0.f};
+
+	// TODO: Annoying logic
+	return Value::Null;
+}
+
+Value Mob::getZ()
+{
+	if (loc.type != DataType::TURF)
+		return {0.f};
+
+	// TODO: Annoying logic
+	return Value::Null;
+}
+
+Value Mob::getDir()
+{
+	return {static_cast<float>(dir)};
+}
+
+Value Mob::getSight()
+{
+	return {static_cast<float>(sight)};
+}
+
+Value Mob::getClient()
+{
+	return {DataType::CLIENT, client_index};
+}
+
+Value Mob::getKey()
+{
+	return {key};
+}
+
+Value Mob::getCKey()
+{
+	return {ckey};
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getGroup()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getContents()
+{
+	return Value::Null;
+}
+
+// TODO: Just really annoying
+Value Mob::getTag()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getVars()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getOverlays()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getUnderlays()
+{
+	return Value::Null;
+}
+
+Value Mob::getParentType()
+{
+	ObjPath* current = path.get();
+	if (current == nullptr)
+		return Value::Null;
+
+	auto type = current_state->FindMobType(current->parent);
+	return {type};
+}
+
 Value Mob::getName()
 {
 	MobFields* f = fields.get();
@@ -104,6 +218,12 @@ Value Mob::getLuminosity()
 {
 	MobFields* f = fields.get();
 	return f ? Value{static_cast<float>(f->luminosity)} : Value::Null;
+}
+
+Value Mob::getLayer()
+{
+	MobFields* f = fields.get();
+	return f ? Value{f->layer} : Value::Null;
 }
 
 Value Mob::getMapText()

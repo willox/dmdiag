@@ -129,6 +129,22 @@ MobType* State::GetMobType(uint32_t index)
 	return &_mobtype_table->elements[index];
 }
 
+Ref<MobType> State::FindMobType(Ref<ObjPath> path)
+{
+	uint32_t count = _mobtype_table->count;
+	MobType* elements = _mobtype_table->elements.get();
+
+	for (uint32_t i = 0; i < count; i++)
+	{
+		if (elements[i].obj_path != path)
+			continue;
+
+		return Ref<MobType>{i};
+	}
+
+	return Ref<MobType>::Invalid();
+}
+
 const char* State::GetVarName(uint32_t index)
 {
 /*

@@ -118,6 +118,9 @@ struct Ref
 	{
 		return index != rhs.index;
 	}
+
+	// is this valid for all refs?
+	static Ref<T> Invalid() { return {0xFFFF}; }
 };
 
 static_assert(sizeof(Ref<String>) == 4);
@@ -130,11 +133,18 @@ struct StringTable
 
 static_assert(sizeof(StringTable) == 8);
 
+struct MobType;
+
 struct Value
 {
 	Value()
 		: type(DataType::NULL_D)
 		, _number(0.f)
+	{}
+
+	Value(DataType type, uint32_t data)
+		: type(type)
+		, _data(data)
 	{}
 
 	Value(float num)
@@ -147,11 +157,18 @@ struct Value
 		, _string(str)
 	{}
 
+	Value(Ref<MobType> path)
+		: type(DataType::MOB_TYPEPATH)
+		, _mob_path(path)
+	{}
+
 	DataType type;
 	union
 	{
+		uint32_t _data;
 		float _number;
 		Ref<String> _string;
+		Ref<MobType> _mob_path;
 	};
 
 	static const Value Null;
@@ -161,9 +178,13 @@ static_assert(sizeof(Value) == 8);
 
 struct Misc;
 
+// Might just be generic 'Path'? Or 'Type'.
 struct ObjPath
 {
-	char unk_0[0x54];
+	Ref<String> path;
+	Ref<ObjPath> parent;
+	uint32_t wat;
+	char unk_0[0x48];
 	Ref<Misc> var_declarations;
 	uint32_t unk_1;
 	Ref<Misc> initial_vars;
@@ -221,20 +242,52 @@ struct MobFields;
 
 struct Mob
 {
-	char unk_0[0x24];
+	Value loc;
+	char unk_0[0x1C];
 	VPtr<uint32_t> unk_1;
 	VariableTable variables;
-	char unk_2[0xC];
+	uint8_t dir;
+	uint8_t unk_2_0;
+	uint8_t unk_2_1;
+	uint8_t unk_2_3;
+	char unk_2_4[0x8];
 	VPtr<uint32_t> unk_3;
 	VPtr<uint32_t> unk_4;
 	VPtr<uint32_t> unk_5;
 	char unk_6[0x8];
 	Ref<MobFields> fields;
-	char unk_7[0x48];
+	char unk_7[0x3C];
+	Ref<String> key;
+	Ref<String> ckey;
+	Ref<ObjPath> path;
 	Ref<MobType> mob_type;
 	char unk_8[0x8];
 	VPtr<uint32_t> unk_9;
-	char unk_10[0x10];
+	char unk_10[0x4];
+	uint16_t client_index;
+	uint16_t unk_11;
+	uint16_t sight;
+	uint16_t unk_12;
+	char unk_13[0x4];
+
+	Value getType();
+	Value getVerbs();
+	Value getLoc();
+	Value getX();
+	Value getY();
+	Value getZ();
+	Value getDir();
+	Value getSight();
+	Value getClient();
+	Value getKey();
+	Value getCKey();
+	Value getGroup();
+	Value getContents();
+	Value getTag(); 
+	Value getVars();
+	Value getOverlays();
+	Value getUnderlays();
+	Value getParentType();
 
 	Value getName();
 	Value getDesc();
@@ -253,6 +306,7 @@ struct Mob
 	Value getInvisibility();
 	Value getInfraLuminosity();
 	Value getLuminosity();
+	Value getLayer();
 	Value getMapText();
 	Value getMapTextX();
 	Value getMapTextY();
@@ -272,6 +326,8 @@ struct Mob
 	Value* GetGlobalField(Ref<String> name);
 };
 
+static const size_t xx = offsetof(Mob, ckey);
+
 static_assert(sizeof(Mob) == 188);
 
 // Lots of things use this structure - could abstract it?
@@ -285,20 +341,26 @@ static_assert(sizeof(MobTable) == 8);
 
 // wtf is going on down here
 
+enum class Gender
+{
+	Neuter,
+	Male,
+	Female,
+	Plural
+};
+
 struct MobFields
 {
 	enum class Flags : uint32_t
 	{
-		//Density = 0x2,
-		//Visibility = 0x4, // what
-		// Opacity
-		// Gender
-
-		// mouse_drop_zone
-		// animate_movement
-		// mouse_opacity_mask
-		// override
-
+		Opacity = 0x01,
+		Density = 0x02,
+		Visibility = 0x04, // What is atom.visibility?
+		GenderFlags = 0xC0, // A 2-bit index to `Gender` enum
+		MouseDropZone = 0x100,
+		MouseOpacity = 0x3000,
+		AnimateMovement = 0xC000,
+		Override = 0x40000,
 	};
 
 	char unk_0[0x1c];
@@ -321,66 +383,72 @@ struct MobFields
 	uint32_t unk_8;
 	uint32_t unk_9;
 	uint32_t unk_10;
-	uint32_t layer;
+	float layer;
 	Ref<String> maptext;
-	uint16_t maptext_x; // (0x64);
-	uint16_t maptext_y; // (0x66);
-	uint16_t maptext_width; // (0x68) (special behaviour)
-	uint16_t maptext_height; // (0x6a) (special behaviour)
-	Value mouse_over_pointer; // (0x6c)
-	Value mouse_drag_pointer; // (0x74)
-	Value mouse_drop_pointer; // (0x7c)
+	uint16_t maptext_x;
+	uint16_t maptext_y;
+	uint16_t maptext_width; // (special behaviour)
+	uint16_t maptext_height; // (special behaviour)
+	Value mouse_over_pointer;
+	Value mouse_drag_pointer;
+	Value mouse_drop_pointer;
 	char unk_11[0x34];
-	Ref<String> render_source; // (0xb8)
-	Ref<String> render_target; // (0xbc)
-	uint16_t vis_flags; // (0xc0)
+	Ref<String> render_source;
+	Ref<String> render_target;
+	uint16_t vis_flags;
 
 	// TODO: transform is in here somewhere
 	// TODO: size unknown
 
 	/*
-	icon_state // 2c
-	visibility // 2d
-	luminosity // 2e
-	opacity // 2f
-	density // 30
-	verbs // 31
+	*type // 25
+	*name // 27
+	*desc // 28
+	*suffix // 29
+	*text // 2a
+	*icon // 2b
+	*icon_state // 2c
+	?visibility // 2d
+	*luminosity // 2e
+	*opacity // 2f
+	*density // 30
+	*verbs // 31
 
-	loc // 32
-	x // 33
-	y // 34
-	z // 35
-	dir // 3a
-	gender // 43
-	sight // 44
-	client // 45
-	key // 46
-	ckey // 47
-	group // 48
-	contents // 49
-	tag // 55
-	vars // 5e
-	overlays // 62
-	underlays // 63
-	layer // 73
-	parent_type // 82
-	mouse_over_pointer // 94
-	mouse_drag_pointer // 95
-	mouse_drop_pointer // 96
-	mouse_drop_zone // 97
-	animate_movement // a5
-	screen_loc // a9
+	*loc // 32
+	*x // 33
+	*y // 34
+	*z // 35
+	*dir // 3a
+	*gender // 43
+	*sight // 44
+	*client // 45
+	*key // 46
+	*ckey // 47
+	*group // 48
+	*contents // 49
+	*tag // 55
+	*vars // 5e
+	*overlays // 62
+	*underlays // 63
+	*layer // 73
+	*parent_type // 82
+	*mouse_over_pointer // 94
+	*mouse_drag_pointer // 95
+	*mouse_drop_pointer // 96
+	*mouse_drop_zone // 97
+	*animate_movement // a5
+	*screen_loc // a9
 	see_in_dark // b3
-	infra_luminosity // b4
-	invisibility // b5
+	*infra_luminosity // b4
+	*invisibility // b5
 	see_invisible // b6
 	see_infrared // b7
-	mouse_opacity // b8
-	pixel_x // bb
-	pixel_y // bc
-	pixel_step_size // bd
-	pixel_z // da
-	_override // db
+	*mouse_opacity // b8
+	*pixel_x // bb
+	*pixel_y // bc
+	*pixel_step_size // bd
+	*pixel_z // da
+	*_override // db
 	bounds // dd
 	locs // de
 	step_x // df
@@ -391,25 +459,25 @@ struct MobFields
 	bound_width // e4
 	bound_height // e5
 	glide_size // eb
-	maptext // ec
-	maptext_width // ed
-	maptext_height // ee
+	*maptext // ec
+	*maptext_width // ed
+	*maptext_height // ee
 	transform // f0
 	alpha // f1
 	color // f2
 	blend_mode // fe
 	appearance // 106
-	maptext_x // 10b
-	maptext_y // 10c
+	*maptext_x // 10b
+	*maptext_y // 10c
 	plane // 10d
 	appearance_flags // 10e
 	pixel_w // 117
 	vis_contents // 119
 	vis_locs // 11a
 	filters // 11c
-	render_source // 129
-	render_target // 12a
-	vis_flags // 12b
+	*render_source // 129
+	*render_target // 12a
+	*vis_flags // 12b
 	*/
 };
 
@@ -420,7 +488,7 @@ struct SomeGlobals
 	uint32_t mob_fields_count;
 };
 
-static const size_t x = offsetof(SomeGlobals, mob_fields);
+static const size_t x = offsetof(MobFields, flags);
 
 
 struct ExecutionContext;
