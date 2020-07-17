@@ -13,11 +13,12 @@ int main(int argc, char** argv)
 
 	for (uint32_t i = 0; i < 100; i++)
 	{
-		auto* mob = state.GetMob(i);
-		auto name = mob->GetField(*state.GetStringRef("name"));
-		auto desc = mob->GetField(*state.GetStringRef("desc"));
-		auto layer = mob->GetField(*state.GetStringRef("layer"));
-		auto stat = mob->GetField(*state.GetStringRef("stat"));
+		dm::Ref<dm::Mob> mob{i};
+
+		auto name = dm::Mob::GetField(mob, *state.GetStringRef("name"));
+		auto desc = dm::Mob::GetField(mob, *state.GetStringRef("desc"));
+		auto layer = dm::Mob::GetField(mob, *state.GetStringRef("layer"));
+		auto stat = dm::Mob::GetField(mob, *state.GetStringRef("stat"));
 
 		continue;
 	}

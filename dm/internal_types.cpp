@@ -31,6 +31,12 @@ ObjPath* Ref<ObjPath>::get()
 };
 
 template<>
+Mob* Ref<Mob>::get()
+{
+	return current_state->GetMob(index);
+}
+
+template<>
 MobType* Ref<MobType>::get()
 {
 	return current_state->GetMobType(index);

@@ -96,113 +96,136 @@ void SetupMobFieldGetters()
 	}
 }
 
-Value Mob::getType()
+Value Mob::getType(Ref<Mob> ref)
 {
-	return Value{mob_type};
+	Mob* pMob = ref.get();
+	return pMob ? Value{pMob->mob_type} : Value::Null;
 }
 
-// TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getVerbs()
+Value Mob::getVerbs(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_VERBS, ref.index};
 }
 
-Value Mob::getLoc()
+Value Mob::getLoc(Ref<Mob> ref)
 {
-	return loc;
+	Mob* pMob = ref.get();
+	return pMob ? Value{pMob->loc} : Value::Null;
 }
 
-Value Mob::getX()
+Value Mob::getX(Ref<Mob> ref)
 {
-	if (loc.type != DataType::TURF)
+	Mob* pMob = ref.get();
+
+	if (pMob == nullptr)
+		return Value::Null;
+
+	if (!pMob || pMob->loc.type != DataType::TURF)
 		return {0.f};
 
 	// TODO: Annoying logic
 	return Value::Null;
 }
 
-Value Mob::getY()
+Value Mob::getY(Ref<Mob> ref)
 {
-	if (loc.type != DataType::TURF)
+	Mob* pMob = ref.get();
+
+	if (pMob == nullptr)
+		return Value::Null;
+
+	if (!pMob || pMob->loc.type != DataType::TURF)
 		return {0.f};
 
 	// TODO: Annoying logic
 	return Value::Null;
 }
 
-Value Mob::getZ()
+Value Mob::getZ(Ref<Mob> ref)
 {
-	if (loc.type != DataType::TURF)
+	Mob* pMob = ref.get();
+
+	if (pMob == nullptr)
+		return Value::Null;
+
+	if (!pMob || pMob->loc.type != DataType::TURF)
 		return {0.f};
 
 	// TODO: Annoying logic
 	return Value::Null;
 }
 
-Value Mob::getDir()
+Value Mob::getDir(Ref<Mob> ref)
 {
-	return {static_cast<float>(dir)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->dir)} : Value::Null;
 }
 
-Value Mob::getSight()
+Value Mob::getSight(Ref<Mob> ref)
 {
-	return {static_cast<float>(sight)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->sight)} : Value::Null;
 }
 
-Value Mob::getClient()
+Value Mob::getClient(Ref<Mob> ref)
 {
-	return {DataType::CLIENT, client_index};
+	Mob* pMob = ref.get();
+	return pMob ? Value{DataType::CLIENT, pMob->client_index} : Value::Null;
 }
 
-Value Mob::getKey()
+Value Mob::getKey(Ref<Mob> ref)
 {
-	return {key};
+	Mob* pMob = ref.get();
+	return pMob ? Value{pMob->key} : Value::Null;
 }
 
-Value Mob::getCKey()
+Value Mob::getCKey(Ref<Mob> ref)
 {
-	return {ckey};
+	Mob* pMob = ref.get();
+	return pMob ? Value{pMob->ckey} : Value::Null;
 }
 
-// TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getGroup()
+Value Mob::getGroup(Ref<Mob> ref)
 {
-	return Value::Null;
+	// TODO: Check
+	return {DataType::LIST_GROUP, ref.index};
 }
 
-// TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getContents()
+Value Mob::getContents(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_CONTENTS, ref.index};
 }
 
 // TODO: Just really annoying
-Value Mob::getTag()
+Value Mob::getTag(Ref<Mob> ref)
 {
 	return Value::Null;
+}
+
+Value Mob::getVars(Ref<Mob> ref)
+{	
+	return {DataType::LIST_MOB_VARS, ref.index};
 }
 
 // TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getVars()
+Value Mob::getOverlays(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_OVERLAYS, ref.index};
 }
 
 // TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getOverlays()
+Value Mob::getUnderlays(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_UNDERLAYS, ref.index};
 }
 
-// TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getUnderlays()
+Value Mob::getParentType(Ref<Mob> ref)
 {
-	return Value::Null;
-}
+	Mob* pMob = ref.get();
+	if (pMob == nullptr)
+		return Value::Null;
 
-Value Mob::getParentType()
-{
-	ObjPath* current = path.get();
+	ObjPath* current = pMob->path.get();
 	if (current == nullptr)
 		return Value::Null;
 
@@ -210,302 +233,342 @@ Value Mob::getParentType()
 	return {type};
 }
 
-Value Mob::getSeeInDark()
+Value Mob::getSeeInDark(Ref<Mob> ref)
 {
-	return {static_cast<float>(see_in_dark)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->see_in_dark)} : Value::Null;
 }
 
-Value Mob::getSeeInvisible()
+Value Mob::getSeeInvisible(Ref<Mob> ref)
 {
-	return {static_cast<float>(see_invisible)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->see_invisible)} : Value::Null;
 }
 
-Value Mob::getSeeInfrared()
+Value Mob::getSeeInfrared(Ref<Mob> ref)
 {
-	return {((uint16_t)flags & (uint16_t)Flags::SeeInfrared) ? 1.f : 0.f};
+	Mob* pMob = ref.get();
+	if (pMob == nullptr)
+		return Value::Null;
+
+	return {((uint16_t)pMob->flags & (uint16_t)Flags::SeeInfrared) ? 1.f : 0.f};
 }
 
-Value Mob::getPixelX()
+Value Mob::getPixelX(Ref<Mob> ref)
 {
-	return {static_cast<float>(pixel_x)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->pixel_x)} : Value::Null;
 }
 
-Value Mob::getPixelY()
+Value Mob::getPixelY(Ref<Mob> ref)
 {
-	return {static_cast<float>(pixel_z)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->pixel_y)} : Value::Null;
 }
 
-Value Mob::getPixelW()
+Value Mob::getPixelW(Ref<Mob> ref)
 {
-	return {static_cast<float>(pixel_w)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->pixel_w)} : Value::Null;
 }
 
 // TODO: harder
-Value Mob::getPixelStepSize()
+Value Mob::getPixelStepSize(Ref<Mob> ref)
 {
 	return Value::Null;
 }
 
-Value Mob::getPixelZ()
+Value Mob::getPixelZ(Ref<Mob> ref)
 {
-	return {static_cast<float>(pixel_z)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->pixel_z)} : Value::Null;
 }
 
 // TODO: annoying
-Value Mob::getLocs()
+Value Mob::getLocs(Ref<Mob> ref)
 {
 	return Value::Null;
 }
 
-Value Mob::getStepX()
+Value Mob::getStepX(Ref<Mob> ref)
 {
-	return {static_cast<float>(step_x)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->step_x)} : Value::Null;
 }
 
-Value Mob::getStepY()
+Value Mob::getStepY(Ref<Mob> ref)
 {
-	return {static_cast<float>(step_x)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->step_y)} : Value::Null;
 }
 
-Value Mob::getStepSize()
+Value Mob::getStepSize(Ref<Mob> ref)
 {
-	return {static_cast<float>(step_size)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->step_size)} : Value::Null;
 }
 
-Value Mob::getBoundX()
+Value Mob::getBoundX(Ref<Mob> ref)
 {
-	return {static_cast<float>(bound_x)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->bound_x)} : Value::Null;
 }
 
-Value Mob::getBoundY()
+Value Mob::getBoundY(Ref<Mob> ref)
 {
-	return {static_cast<float>(bound_y)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->bound_y)} : Value::Null;
 }
 
-Value Mob::getBoundWidth()
+Value Mob::getBoundWidth(Ref<Mob> ref)
 {
-	return {static_cast<float>(bound_width)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->bound_width)} : Value::Null;
 }
 
-Value Mob::getBoundHeight()
+Value Mob::getBoundHeight(Ref<Mob> ref)
 {
-	return {static_cast<float>(bound_height)};
+	Mob* pMob = ref.get();
+	return pMob ? Value{static_cast<float>(pMob->bound_height)} : Value::Null;
 }
 
 // TODO: harder
-Value Mob::getGlideSize()
+Value Mob::getGlideSize(Ref<Mob> ref)
 {
 	return Value::Null;
 }
 
 // TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getVisContents()
+Value Mob::getVisContents(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_VIS_CONTENTS, ref.index};
 }
 
 // TODO: Needs the Mob index (move out of Mob class?)
-Value Mob::getVisLocs()
+Value Mob::getVisLocs(Ref<Mob> ref)
 {
-	return Value::Null;
+	return {DataType::LIST_MOB_VIS_LOCS, ref.index};
 }
 
 // TODO: All of these 
-Value Mob::getFilters() { return Value::Null; }
-Value Mob::getTransform() { return Value::Null; }
-Value Mob::getAlpha() { return Value::Null; }
-Value Mob::getColor() { return Value::Null; }
-Value Mob::getBlendMode() { return Value::Null; }
-Value Mob::getAppearance() { return Value::Null; }
-Value Mob::getPlane() { return Value::Null; }
-Value Mob::getAppearanceFlags() { return Value::Null; }
+Value Mob::getFilters(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getTransform(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getAlpha(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getColor(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getBlendMode(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getAppearance(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getPlane(Ref<Mob> ref) { return Value::Null; }
+Value Mob::getAppearanceFlags(Ref<Mob> ref) { return Value::Null; }
 
-Value Mob::getName()
+Value Mob::getName(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->name} : Value::Null;
 }
 
-Value Mob::getDesc()
+Value Mob::getDesc(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->desc} : Value::Null;
 }
 
-Value Mob::getSuffix()
+Value Mob::getSuffix(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->suffix} : Value::Null;
 }
 
-Value Mob::getScreenLoc()
+Value Mob::getScreenLoc(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->screen_loc} : Value::Null;
 }
 
-Value Mob::getText()
+Value Mob::getText(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->text} : Value::Null;
 }
 
 // TODO
-Value Mob::getIcon()
+Value Mob::getIcon(Ref<Mob> ref)
 {
 	return Value::Null;
 }
 
-Value Mob::getIconState()
+Value Mob::getIconState(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->icon_state} : Value::Null;
 }
 
 // TODO
-Value Mob::getDensity()
+Value Mob::getDensity(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getOpacity()
+Value Mob::getOpacity(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getGender()
+Value Mob::getGender(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getMouseDropZone()
+Value Mob::getMouseDropZone(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getAnimateMovement()
+Value Mob::getAnimateMovement(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getMouseOpacity()
+Value Mob::getMouseOpacity(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getOverride()
+Value Mob::getOverride(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
-Value Mob::getInvisibility()
+Value Mob::getInvisibility(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{static_cast<float>(f->invisibility)} : Value::Null;
 }
 
-Value Mob::getInfraLuminosity()
+Value Mob::getInfraLuminosity(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{static_cast<float>(f->infra_luminosity)} : Value::Null;
 }
 
-Value Mob::getLuminosity()
+Value Mob::getLuminosity(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{static_cast<float>(f->luminosity)} : Value::Null;
 }
 
-Value Mob::getLayer()
+Value Mob::getLayer(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->layer} : Value::Null;
 }
 
-Value Mob::getMapText()
+Value Mob::getMapText(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{f->maptext} : Value::Null;
 }
 
-Value Mob::getMapTextX()
+Value Mob::getMapTextX(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{static_cast<float>(f->maptext_x)} : Value::Null;
 }
 
-Value Mob::getMapTextY()
+Value Mob::getMapTextY(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? Value{static_cast<float>(f->maptext_y)} : Value::Null;
 }
 
 // TODO
-Value Mob::getMapTextWidth()
+Value Mob::getMapTextWidth(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
 // TODO
-Value Mob::getMapTextHeight()
+Value Mob::getMapTextHeight(Ref<Mob> ref)
 {
 	return {0.f};
 }
 
-Value Mob::getMouseOverPointer()
+Value Mob::getMouseOverPointer(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? f->mouse_over_pointer : Value::Null;
 }
 
-Value Mob::getMouseDragPointer()
+Value Mob::getMouseDragPointer(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? f->mouse_drag_pointer : Value::Null;
 }
 
-Value Mob::getMouseDropPointer()
+Value Mob::getMouseDropPointer(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
 	return f ? f->mouse_drop_pointer : Value::Null;
 }
 
-Value Mob::getRenderSource()
+Value Mob::getRenderSource(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
-	return f ? Value{f->render_source} : Value::Null;
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
+	return f ? Value{f->render_source}: Value::Null;
 }
 
-Value Mob::getRenderTarget()
+Value Mob::getRenderTarget(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
-	return f ? Value{f->render_target} : Value::Null;
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
+	return f ? Value{f->render_target}: Value::Null;
 }
 
-Value Mob::getVisFlags()
+Value Mob::getVisFlags(Ref<Mob> ref)
 {
-	MobFields* f = fields.get();
-	return f ? Value{static_cast<float>(f->vis_flags)} : Value::Null;
+	Mob* pMob = ref.get();
+	MobFields* f = pMob ? pMob->fields.get() : nullptr;
+	return f ? Value{static_cast<float>(f->vis_flags)}: Value::Null;
 }
 
 
-std::optional<Value> Mob::GetField(Ref<String> name)
+std::optional<Value> Mob::GetField(Ref<Mob> ref, Ref<String> name)
 {
 	// Check built-in fields first
 	auto getter = getters.find(name.index);
 	if (getter != getters.end())
 	{
-		return (this->*getter->second)();
+		return (*getter->second)(ref);
 	}
 
-	uint32_t count = variables.count;
-	Variable* vars = variables.elements.get();
+	Mob* pMob = ref.get();
+	if (pMob == nullptr)
+		return std::nullopt;
+
+	uint32_t count = pMob->variables.count;
+	Variable* vars = pMob->variables.elements.get();
 
 	// TODO: Could use a binary search here
 	for (uint32_t idx = 0; idx < count; idx++)
@@ -518,13 +581,13 @@ std::optional<Value> Mob::GetField(Ref<String> name)
 		}
 	}
 
-	auto initial = GetInitialField(name);
+	auto initial = GetInitialField(ref, name);
 	if (initial)
 	{
 		return initial;
 	}
 
-	auto global = GetGlobalField(name);
+	auto global = GetGlobalField(ref, name);
 	if (global)
 	{
 		return global;
@@ -533,9 +596,13 @@ std::optional<Value> Mob::GetField(Ref<String> name)
 	return std::nullopt;
 }
 
-std::optional<Value> Mob::GetInitialField(Ref<String> name)
+std::optional<Value> Mob::GetInitialField(Ref<Mob> ref, Ref<String> name)
 {
-	MobType* pMobType = mob_type.get();
+	Mob* pMob = ref.get();
+	if (pMob == nullptr)
+		return std::nullopt;
+
+	MobType* pMobType = pMob->mob_type.get();
 	if (pMobType == nullptr)
 		return std::nullopt;
 
@@ -564,9 +631,13 @@ std::optional<Value> Mob::GetInitialField(Ref<String> name)
 	return std::nullopt;
 }
 
-std::optional<Value> Mob::GetGlobalField(Ref<String> name)
+std::optional<Value> Mob::GetGlobalField(Ref<Mob> ref, Ref<String> name)
 {
-	MobType* pMobType = mob_type.get();
+	Mob* pMob = ref.get();
+	if (pMob == nullptr)
+		return std::nullopt;
+
+	MobType* pMobType = pMob->mob_type.get();
 	if (pMobType == nullptr)
 		return std::nullopt;
 
