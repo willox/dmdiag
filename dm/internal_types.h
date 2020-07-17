@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <optional>
 #include "VPtr.h"
 
 namespace dm
@@ -198,7 +199,7 @@ struct ObjPathTable
 	VPtr<ObjPath> elements;
 	uint32_t count;
 };
- 
+
 static_assert(sizeof(ObjPathTable) == 8);
 
 // TODO: What really is this?
@@ -240,17 +241,32 @@ static_assert(sizeof(VariableTable) == 8);
 
 struct MobFields;
 
+void SetupMobFieldGetters();
+
 struct Mob
 {
+	enum class Flags : uint16_t
+	{
+		SeeInfrared,
+	};
+
 	Value loc;
-	char unk_0[0x1C];
+	char unk_0_0[0x8];
+	uint16_t bound_x;
+	uint16_t bound_y;
+	uint16_t bound_width;
+	uint16_t bound_height;
+	float step_x;
+	float step_y;
+	float step_size;
 	VPtr<uint32_t> unk_1;
 	VariableTable variables;
 	uint8_t dir;
 	uint8_t unk_2_0;
-	uint8_t unk_2_1;
-	uint8_t unk_2_3;
-	char unk_2_4[0x8];
+	uint16_t pixel_x;
+	uint16_t pixel_y;
+	uint16_t pixel_w;
+	uint16_t pixel_z;
 	VPtr<uint32_t> unk_3;
 	VPtr<uint32_t> unk_4;
 	VPtr<uint32_t> unk_5;
@@ -267,8 +283,11 @@ struct Mob
 	uint16_t client_index;
 	uint16_t unk_11;
 	uint16_t sight;
-	uint16_t unk_12;
-	char unk_13[0x4];
+	Flags flags;
+	uint8_t see_in_dark;
+	uint8_t see_invisible;
+	uint8_t unk_14;
+	uint8_t unk_15;
 
 	Value getType();
 	Value getVerbs();
@@ -288,6 +307,34 @@ struct Mob
 	Value getOverlays();
 	Value getUnderlays();
 	Value getParentType();
+	Value getSeeInDark();
+	Value getSeeInvisible();
+	Value getSeeInfrared();
+	Value getPixelX();
+	Value getPixelY();
+	Value getPixelW();
+	Value getPixelStepSize();
+	Value getPixelZ();
+	Value getLocs();
+	Value getStepX();
+	Value getStepY();
+	Value getStepSize();
+	Value getBoundX();
+	Value getBoundY();
+	Value getBoundWidth();
+	Value getBoundHeight();
+	Value getGlideSize();
+	Value getVisContents();
+	Value getVisLocs();
+
+	Value getFilters();
+	Value getTransform();
+	Value getAlpha();
+	Value getColor();
+	Value getBlendMode();
+	Value getAppearance();
+	Value getPlane();
+	Value getAppearanceFlags();
 
 	Value getName();
 	Value getDesc();
@@ -321,12 +368,12 @@ struct Mob
 
 
 
-	Value* GetField(Ref<String> name);
-	Value* GetInitialField(Ref<String> name);
-	Value* GetGlobalField(Ref<String> name);
+	std::optional<Value> GetField(Ref<String> name);
+	std::optional<Value> GetInitialField(Ref<String> name);
+	std::optional<Value> GetGlobalField(Ref<String> name);
 };
 
-static const size_t xx = offsetof(Mob, ckey);
+static const size_t p = offsetof(Mob, pixel_z);
 
 static_assert(sizeof(Mob) == 188);
 
@@ -438,27 +485,27 @@ struct MobFields
 	*mouse_drop_zone // 97
 	*animate_movement // a5
 	*screen_loc // a9
-	see_in_dark // b3
+	*see_in_dark // b3
 	*infra_luminosity // b4
 	*invisibility // b5
-	see_invisible // b6
-	see_infrared // b7
+	*see_invisible // b6
+	*see_infrared // b7
 	*mouse_opacity // b8
 	*pixel_x // bb
 	*pixel_y // bc
 	*pixel_step_size // bd
 	*pixel_z // da
 	*_override // db
-	bounds // dd
-	locs // de
-	step_x // df
-	step_y // e0
-	step_size // e1
-	bound_x // e2
-	bound_y // e3
-	bound_width // e4
-	bound_height // e5
-	glide_size // eb
+	*bounds // dd
+	*locs // de
+	*step_x // df
+	*step_y // e0
+	*step_size // e1
+	*bound_x // e2
+	*bound_y // e3
+	*bound_width // e4
+	*bound_height // e5
+	*glide_size // eb
 	*maptext // ec
 	*maptext_width // ed
 	*maptext_height // ee
@@ -471,10 +518,10 @@ struct MobFields
 	*maptext_y // 10c
 	plane // 10d
 	appearance_flags // 10e
-	pixel_w // 117
-	vis_contents // 119
-	vis_locs // 11a
-	filters // 11c
+	*pixel_w // 117
+	*vis_contents // 119
+	*vis_locs // 11a
+	*filters // 11c
 	*render_source // 129
 	*render_target // 12a
 	*vis_flags // 12b

@@ -1,8 +1,100 @@
 #include "internal_types.h"
 #include "State.h"
+#include <map>
+#include <utility>
 
 namespace dm
 {
+
+// TODO: This global has to GOOO
+using GetterFn = decltype(&Mob::getType);
+std::map<uint32_t, GetterFn> getters;
+
+void SetupMobFieldGetters()
+{
+	std::pair<const char*, GetterFn> vars[] = {
+		{ "type", &Mob::getType },
+		{ "verbs", &Mob::getVerbs },
+		{ "loc", &Mob::getLoc },
+		{ "x", &Mob::getX },
+		{ "y", &Mob::getY },
+		{ "z", &Mob::getZ },
+		{ "dir", &Mob::getDir },
+		{ "sight", &Mob::getSight },
+		{ "client", &Mob::getClient },
+		{ "key", &Mob::getKey },
+		{ "ckey", &Mob::getCKey },
+		{ "group", &Mob::getGroup },
+		{ "contents", &Mob::getContents },
+		{ "tag", &Mob::getTag },
+		{ "vars", &Mob::getVars },
+		{ "overlays", &Mob::getOverlays },
+		{ "underlays", &Mob::getUnderlays },
+		{ "parent_type", &Mob::getParentType },
+		{ "see_in_dark", &Mob::getSeeInDark },
+		{ "see_invisible", &Mob::getSeeInvisible },
+		{ "see_infrared", &Mob::getSeeInfrared },
+		{ "pixel_x", &Mob::getPixelX },
+		{ "pixel_y", &Mob::getPixelY },
+		{ "pixel_w", &Mob::getPixelW },
+		{ "pixel_step_size", &Mob::getPixelStepSize },
+		{ "pixel_z", &Mob::getPixelZ },
+		{ "locs", &Mob::getLocs },
+		{ "step_x", &Mob::getStepX },
+		{ "step_y", &Mob::getStepY },
+		{ "step_size", &Mob::getStepSize },
+		{ "bound_x", &Mob::getBoundX },
+		{ "bound_y", &Mob::getBoundY },
+		{ "bound_width", &Mob::getBoundWidth },
+		{ "bound_height", &Mob::getBoundHeight },
+		{ "glide_size", &Mob::getGlideSize },
+		{ "vis_contents", &Mob::getVisContents },
+		{ "vis_locs", &Mob::getVisLocs },
+		{ "filters", &Mob::getFilters },
+		{ "transform", &Mob::getTransform },
+		{ "alpha", &Mob::getAlpha },
+		{ "color", &Mob::getColor },
+		{ "blend_mode", &Mob::getBlendMode },
+		{ "appearance", &Mob::getAppearance },
+		{ "plane", &Mob::getPlane },
+		{ "appearance_flags", &Mob::getAppearanceFlags },
+		{ "name", &Mob::getName },
+		{ "desc", &Mob::getDesc },
+		{ "suffix", &Mob::getSuffix },
+		{ "screen_loc", &Mob::getScreenLoc },
+		{ "text", &Mob::getText },
+		{ "icon", &Mob::getIcon },
+		{ "icon_state", &Mob::getIconState },
+		{ "density", &Mob::getDensity },
+		{ "opacity", &Mob::getOpacity },
+		{ "gender", &Mob::getGender },
+		{ "mouse_drop_zone", &Mob::getMouseDropZone },
+		{ "animate_movement", &Mob::getAnimateMovement },
+		{ "mouse_opacity", &Mob::getMouseOpacity },
+		{ "override", &Mob::getOverride },
+		{ "invisibility", &Mob::getInvisibility },
+		{ "infra_luminosity", &Mob::getInfraLuminosity },
+		{ "luminosity", &Mob::getLuminosity },
+		{ "layer", &Mob::getLayer },
+		{ "maptext", &Mob::getMapText },
+		{ "maptext_x", &Mob::getMapTextX },
+		{ "maptext_y", &Mob::getMapTextY },
+		{ "maptext_width", &Mob::getMapTextWidth },
+		{ "maptext_height", &Mob::getMapTextHeight },
+		{ "mouse_over_pointer", &Mob::getMouseOverPointer },
+		{ "mouse_drag_pointer", &Mob::getMouseDragPointer },
+		{ "mouse_drop_pointer", &Mob::getMouseDropPointer },
+		{ "render_source", &Mob::getRenderSource },
+		{ "render_target", &Mob::getRenderTarget },
+		{ "vis_flags", &Mob::getVisFlags },
+	};
+
+	for (auto& pair : vars)
+	{
+		// TODO: string might not exist :(
+		getters[current_state->GetStringRef(pair.first)->index] = pair.second;
+	}
+}
 
 Value Mob::getType()
 {
@@ -117,6 +209,116 @@ Value Mob::getParentType()
 	auto type = current_state->FindMobType(current->parent);
 	return {type};
 }
+
+Value Mob::getSeeInDark()
+{
+	return {static_cast<float>(see_in_dark)};
+}
+
+Value Mob::getSeeInvisible()
+{
+	return {static_cast<float>(see_invisible)};
+}
+
+Value Mob::getSeeInfrared()
+{
+	return {((uint16_t)flags & (uint16_t)Flags::SeeInfrared) ? 1.f : 0.f};
+}
+
+Value Mob::getPixelX()
+{
+	return {static_cast<float>(pixel_x)};
+}
+
+Value Mob::getPixelY()
+{
+	return {static_cast<float>(pixel_z)};
+}
+
+Value Mob::getPixelW()
+{
+	return {static_cast<float>(pixel_w)};
+}
+
+// TODO: harder
+Value Mob::getPixelStepSize()
+{
+	return Value::Null;
+}
+
+Value Mob::getPixelZ()
+{
+	return {static_cast<float>(pixel_z)};
+}
+
+// TODO: annoying
+Value Mob::getLocs()
+{
+	return Value::Null;
+}
+
+Value Mob::getStepX()
+{
+	return {static_cast<float>(step_x)};
+}
+
+Value Mob::getStepY()
+{
+	return {static_cast<float>(step_x)};
+}
+
+Value Mob::getStepSize()
+{
+	return {static_cast<float>(step_size)};
+}
+
+Value Mob::getBoundX()
+{
+	return {static_cast<float>(bound_x)};
+}
+
+Value Mob::getBoundY()
+{
+	return {static_cast<float>(bound_y)};
+}
+
+Value Mob::getBoundWidth()
+{
+	return {static_cast<float>(bound_width)};
+}
+
+Value Mob::getBoundHeight()
+{
+	return {static_cast<float>(bound_height)};
+}
+
+// TODO: harder
+Value Mob::getGlideSize()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getVisContents()
+{
+	return Value::Null;
+}
+
+// TODO: Needs the Mob index (move out of Mob class?)
+Value Mob::getVisLocs()
+{
+	return Value::Null;
+}
+
+// TODO: All of these 
+Value Mob::getFilters() { return Value::Null; }
+Value Mob::getTransform() { return Value::Null; }
+Value Mob::getAlpha() { return Value::Null; }
+Value Mob::getColor() { return Value::Null; }
+Value Mob::getBlendMode() { return Value::Null; }
+Value Mob::getAppearance() { return Value::Null; }
+Value Mob::getPlane() { return Value::Null; }
+Value Mob::getAppearanceFlags() { return Value::Null; }
 
 Value Mob::getName()
 {
@@ -293,8 +495,15 @@ Value Mob::getVisFlags()
 }
 
 
-Value* Mob::GetField(Ref<String> name)
+std::optional<Value> Mob::GetField(Ref<String> name)
 {
+	// Check built-in fields first
+	auto getter = getters.find(name.index);
+	if (getter != getters.end())
+	{
+		return (this->*getter->second)();
+	}
+
 	uint32_t count = variables.count;
 	Variable* vars = variables.elements.get();
 
@@ -305,38 +514,38 @@ Value* Mob::GetField(Ref<String> name)
 
 		if (x.name == name)
 		{
-			return &x.value;
+			return x.value;
 		}
 	}
 
-	Value* initial = GetInitialField(name);
-	if (initial != nullptr)
+	auto initial = GetInitialField(name);
+	if (initial)
 	{
 		return initial;
 	}
 
-	Value* global = GetGlobalField(name);
-	if (global != nullptr)
+	auto global = GetGlobalField(name);
+	if (global)
 	{
 		return global;
 	}
 
-	return nullptr;
+	return std::nullopt;
 }
 
-Value* Mob::GetInitialField(Ref<String> name)
+std::optional<Value> Mob::GetInitialField(Ref<String> name)
 {
 	MobType* pMobType = mob_type.get();
 	if (pMobType == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	ObjPath* pObjPath = pMobType->obj_path.get();
 	if (pObjPath == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	Misc* pInitialVars = pObjPath->initial_vars.get();
 	if (pInitialVars == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	uint32_t count = pInitialVars->initial_variable_table.count();
 	InitialVariable* vars = pInitialVars->initial_variable_table.variables.get();
@@ -348,26 +557,26 @@ Value* Mob::GetInitialField(Ref<String> name)
 
 		if (x.name == name)
 		{
-			return &x.value;
+			return x.value;
 		}
 	}
 
-	return nullptr;
+	return std::nullopt;
 }
 
-Value* Mob::GetGlobalField(Ref<String> name)
+std::optional<Value> Mob::GetGlobalField(Ref<String> name)
 {
 	MobType* pMobType = mob_type.get();
 	if (pMobType == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	ObjPath* pObjPath = pMobType->obj_path.get();
 	if (pObjPath == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	Misc* pVarDeclarations = pObjPath->var_declarations.get();
 	if (pVarDeclarations == nullptr)
-		return nullptr;
+		return std::nullopt;
 
 	uint32_t count = pVarDeclarations->var_declaration_table.count();
 	VarDeclaration* vars = pVarDeclarations->var_declaration_table.variables.get();
@@ -383,11 +592,11 @@ Value* Mob::GetGlobalField(Ref<String> name)
 		// Dumb match against str pointers, is ok
 		if (x.name.string() == name.string())
 		{
-			return x.value.get();
+			return *x.value.get();
 		}
 	}
 
-	return nullptr;
+	return std::nullopt;
 }
 
 }

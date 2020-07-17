@@ -8,19 +8,18 @@ int main(int argc, char** argv)
 {
 	dm::State state(dump_path);
 
+	// TODO: remove
+	dm::SetupMobFieldGetters();
+
 	for (uint32_t i = 0; i < 100; i++)
 	{
 		auto* mob = state.GetMob(i);
-		auto* path = mob->path.get();
-		dm::Ref<dm::String>* str = state.GetStringRef("name");
-		if (str == nullptr)
-			continue;
+		auto name = mob->GetField(*state.GetStringRef("name"));
+		auto desc = mob->GetField(*state.GetStringRef("desc"));
+		auto layer = mob->GetField(*state.GetStringRef("layer"));
+		auto stat = mob->GetField(*state.GetStringRef("stat"));
 
-		auto var = mob->GetField(*str);
-		if (var)
-		{
-			continue;
-		}
+		continue;
 	}
 
 	return 0;
