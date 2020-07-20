@@ -185,9 +185,11 @@ struct ObjPath
 	Ref<String> path;
 	Ref<ObjPath> parent;
 	uint32_t wat;
-	char unk_0[0x48];
+	char unk_0[0x40];
+	Ref<String> test;
+	Ref<Misc> interesting_index;
 	Ref<Misc> var_declarations;
-	uint32_t unk_1;
+	Ref<Misc> another;
 	Ref<Misc> initial_vars;
 	char unk_2[0x4];
 };
@@ -535,33 +537,27 @@ static const size_t x = offsetof(MobFields, flags);
 
 
 struct ExecutionContext;
+struct Proc;
 
-struct ProcConstants
+struct ProcInstance
 {
-	int proc_id;
+	Ref<Proc> proc;
 	int unknown1;
 	Value usr;
 	Value src;
 	union
 	{
 		VPtr<ExecutionContext> context;
-		VPtr<ProcConstants> next; // When we're part of the global `constants_freelist` linked list, this is the next element
+		VPtr<ProcInstance> next; // When we're part of the global `procinstance_freelist` linked list, this is the next element
 	};
-	union
-	{
-		int argslist_id;
-	};
-
+	int argslist_id;
 	int unknown4; //some callback thing
 	union
 	{
 		int unknown5;
 		int extended_profile_id;
 	};
-	union
-	{
-		int arg_count;
-	};
+	int arg_count;
 	VPtr<Value> args;
 	char unknown6[0x58];
 	int time_to_resume;
@@ -569,10 +565,10 @@ struct ProcConstants
 
 struct ExecutionContext
 {
-	VPtr<ProcConstants> constants;
+	VPtr<ProcInstance> proc_instance;
 	VPtr<ExecutionContext> parent_context;
 	Ref<String> dbg_proc_file;
-	Ref<String> dbg_current_line;
+	uint32_t dbg_current_line;
 	VPtr<uint32_t> bytecode;
 	uint16_t current_opcode;
 	char test_flag;
@@ -673,12 +669,19 @@ public:
 	uint16_t count() { return count_mul2 / 2; }
 };
 
+struct LocalVariableTable
+{
+	uint16_t count;
+	VPtr<Ref<VarName>> names;
+};
+
 struct Misc
 {
 	union
 	{
 		InitialVariableTable initial_variable_table;
 		VarDeclarationTable var_declaration_table;
+		LocalVariableTable local_variable_table;
 		// proc bytecode
 	};
 };
@@ -693,8 +696,28 @@ struct MiscTable
 
 static_assert(sizeof(MiscTable) == 8);
 
+struct Proc
+{
+	Ref<String> path;
+	Ref<String> name;
+	uint32_t unk_0;
+	uint32_t unk_1;
+	uint32_t unk_2;
+	uint32_t unk_3;
+	Ref<Misc> bytecode;
+	Ref<Misc> locals;
+	Ref<Misc> test;
+};
 
+static_assert(sizeof(Proc) == 36);
 
+struct ProcTable
+{
+	VPtr<Proc> elements;
+	uint32_t count;
+};
+
+static_assert(sizeof(ProcTable) == 8);
 
 }
 

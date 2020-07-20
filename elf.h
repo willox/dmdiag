@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <optional>
 #include <memory>
+#include <string_view>
 
 // Mmmm
 
@@ -100,7 +101,7 @@ public:
 	std::optional<std::vector<std::pair<uint32_t, uint32_t>>> FindRegions();
 
 	template<typename T>
-	T* Scan(const char* signature, size_t offset)
+	T* Scan(std::string_view signature, size_t offset)
 	{
 		for (auto region : regions)
 		{
@@ -114,7 +115,7 @@ public:
 			// i'm pretty sure this could miss a result in certain cases
 			for (char* ptr = begin; ptr < end; ptr++) {
 				if (signature[loc] == '?' || signature[loc] == *ptr) {
-					if (signature[loc + 1] == '\0') {
+					if (loc + 1 >= signature.size()) {
 						return reinterpret_cast<T*>(ptr - loc + offset); // TODO: Check size and offset
 					}
 

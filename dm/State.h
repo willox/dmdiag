@@ -28,6 +28,7 @@ public:
 	ObjPath* GetObjPath(uint32_t index);
 	Misc* GetMisc(uint32_t index);
 	MobFields* GetMobFields(uint32_t index);
+	Proc* GetProc(uint32_t index);
 
 	std::byte* Translate(uint32_t pointer, uint32_t size);
 
@@ -45,6 +46,9 @@ public:
 	ObjPathTable* _obj_path_table;
 	MiscTable* _misc_table;
 	SomeGlobals* _someglobals;
+	ProcTable* _proc_table;
+
+	VPtr<ProcInstance>* _sleeper_buffer;
 
 	std::vector<const char*> _strings;
 	std::map<std::string, Ref<String>> _string_refs;

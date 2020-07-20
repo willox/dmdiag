@@ -1,3 +1,14 @@
+class StackFrame
+{
+	constructor(_execution_context)
+	{
+		execution_context = _execution_context
+	}
+
+	execution_context_ptr = null
+}
+
+
 class UnknownType
 {
 	constructor(_type)

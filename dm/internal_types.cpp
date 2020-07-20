@@ -54,6 +54,12 @@ MobFields* Ref<MobFields>::get()
 	return current_state->GetMobFields(index);
 }
 
+template<>
+Proc* Ref<Proc>::get()
+{
+	return current_state->GetProc(index);
+}
+
 // TODO: Can be a binary search
 Value* VariableTable::GetField(Ref<String> key)
 {

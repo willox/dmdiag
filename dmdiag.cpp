@@ -11,7 +11,102 @@
 #include "sqstdsystem.h"
 #include <string>
 
-static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.80099";
+//static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.80099";
+static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.10813";
+
+static dm::ProcInstance* current_frame = nullptr;
+
+SQInteger frame(HSQUIRRELVM v)
+{
+	if (sq_gettop(v) != 2)
+		return 0;
+
+	SQInteger index;
+	sq_getinteger(v, 2, &index);
+
+	uint32_t frame = 0;
+	dm::ExecutionContext* ctx = dm::current_state->_current_execution_context;
+	while (ctx)
+	{
+		if (frame == index)
+		{
+			current_frame = ctx->proc_instance.get();
+		}
+
+		frame++;
+		ctx = ctx->parent_context.get();
+	}
+
+	return 0;
+}
+
+std::string Var2Str(dm::Value& val)
+{
+	if (val.type == dm::DataType::NULL_D)
+	{
+		return "null";
+	}
+
+	if (val.type == dm::DataType::NUMBER)
+	{
+		return std::to_string(val._number);
+	}
+
+	if (val.type == dm::DataType::LIST)
+	{
+		return "list#" + std::to_string(val._data);
+	}
+
+	if (val.type == dm::DataType::DATUM)
+	{
+		return "datum#" + std::to_string(val._data);
+	}
+
+	return "<unknown type>";
+}
+
+SQInteger locals(HSQUIRRELVM v)
+{
+	dm::ExecutionContext* ctx = current_frame->context.get();
+
+	std::cout << ". = " << Var2Str(ctx->dot) << '\n';
+	std::cout << "src = " << Var2Str(ctx->proc_instance->src) << '\n';
+
+	uint32_t local_count = ctx->local_var_count;
+	dm::Ref<dm::VarName>* local_names = current_frame->proc.get()->locals.get()->local_variable_table.names.get();
+
+	for (uint32_t i = 0; i < local_count; i++)
+	{
+		std::cout << local_names[i].string() << " = " << Var2Str(ctx->local_variables[i]) << '\n';
+	}
+
+	return 0;
+}
+
+SQInteger trace(HSQUIRRELVM v)
+{
+	uint32_t frame = 0;
+	dm::ExecutionContext* ctx = dm::current_state->_current_execution_context;
+	while (ctx)
+	{
+		const char* pName = ctx->proc_instance->proc.get()->path.string();
+		if (strlen(pName) == 0)
+			pName = "<unnamed>";
+
+		const char* pFile = ctx->dbg_proc_file.string();
+		if (strlen(pFile) == 0)
+			pFile = "<none>";
+
+		uint32_t line = ctx->dbg_current_line;
+
+		std::cout << ((current_frame == ctx->proc_instance.get()) ? "(selected) " : "") << '#' << frame << "  " << pName << " @ " << pFile << ':' << line << '\n';
+
+		frame++;
+		ctx = ctx->parent_context.get();
+	}
+
+	return 0;
+}
 
 void printfunc(HSQUIRRELVM v, const SQChar *s, ...) { 
 	va_list arglist; 
@@ -95,18 +190,6 @@ int main(int argc, char** argv)
 	// TODO: remove
 	dm::SetupMobFieldGetters();
 
-	for (uint32_t i = 0; i < 100; i++)
-	{
-		dm::Ref<dm::Mob> mob{i};
-
-		auto name = dm::Mob::GetField(mob, *state.GetStringRef("name"));
-		auto desc = dm::Mob::GetField(mob, *state.GetStringRef("desc"));
-		auto layer = dm::Mob::GetField(mob, *state.GetStringRef("layer"));
-		auto stat = dm::Mob::GetField(mob, *state.GetStringRef("stat"));
-
-		continue;
-	}
-
 	HSQUIRRELVM v = sq_open(1024);
 	sqstd_seterrorhandlers(v);
 	sq_setprintfunc(v, printfunc, printfunc);
@@ -120,6 +203,18 @@ int main(int argc, char** argv)
 
 	sq_pushstring(v, "GetField_Mob", sizeof("GetField_Mob") - 1);
 	sq_newclosure(v, GetField_Mob, 0);
+	sq_newslot(v, -3, false);
+
+	sq_pushstring(v, "locals", sizeof("locals") - 1);
+	sq_newclosure(v, locals, 0);
+	sq_newslot(v, -3, false);
+
+	sq_pushstring(v, "frame", sizeof("frame") - 1);
+	sq_newclosure(v, frame, 0);
+	sq_newslot(v, -3, false);
+
+	sq_pushstring(v, "trace", sizeof("trace") - 1);
+	sq_newclosure(v, trace, 0);
 	sq_newslot(v, -3, false);
 
 	/*
