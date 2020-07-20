@@ -3,21 +3,6 @@
 
 namespace dm
 {
-
-const Value Value::Null;
-
-template<>
-const char* Ref<String>::string()
-{
-	return current_state->GetString(index);
-};
-
-template<>
-const char* Ref<VarName>::string()
-{
-	return current_state->GetVarName(index);
-};
-
 template<>
 Value* Ref<Value>::get()
 {

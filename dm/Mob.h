@@ -1,6 +1,7 @@
 #pragma once
 
 #include "internal_types.h"
+#include "Value.h"
 
 namespace dm
 {
