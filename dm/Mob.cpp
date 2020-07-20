@@ -1,4 +1,4 @@
-#include "internal_types.h"
+#include "Mob.h"
 #include "State.h"
 #include <map>
 #include <utility>
@@ -94,6 +94,24 @@ void SetupMobFieldGetters()
 		// TODO: string might not exist :(
 		getters[current_state->GetStringRef(pair.first)->index] = pair.second;
 	}
+}
+
+template<>
+Mob* Ref<Mob>::get()
+{
+	return current_state->GetMob(index);
+}
+
+template<>
+MobType* Ref<MobType>::get()
+{
+	return current_state->GetMobType(index);
+};
+
+template<>
+MobFields* Ref<MobFields>::get()
+{
+	return current_state->GetMobFields(index);
 }
 
 Value Mob::getType(Ref<Mob> ref)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "internal_types.h"
+#include "dm.h"
 #include "elf.h"
 #include <vector>
 #include <map>

@@ -28,7 +28,7 @@ target_include_directories(sqstdlib_static INTERFACE ${CMAKE_BINARY_DIR}/squirre
 
 
 
-add_executable(dmdiag dm/internal_types.cpp dm/internal_types.h dmdiag.h dmdiag.cpp elf.h elf.cpp dm/State.h dm/State.cpp dm/VPtr.cpp dm/VPtr.h dm/Mob.cpp)
+add_executable(dmdiag dm/internal_types.cpp dm/internal_types.h dmdiag.h dmdiag.cpp elf.h elf.cpp dm/dm.h dm/State.h dm/State.cpp dm/VPtr.cpp dm/VPtr.h dm/Mob.h dm/Mob.cpp)
 target_link_libraries(dmdiag squirrel_static sqstdlib_static)
 
 include_directories(dmdiag .)

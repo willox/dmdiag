@@ -6,6 +6,11 @@
 
 namespace dm
 {
+struct Mob;
+struct MobFields;
+struct MobTable;
+struct MobType;
+struct MobTypeTable;
 
 enum class DataType : uint8_t
 {
@@ -134,8 +139,6 @@ struct StringTable
 
 static_assert(sizeof(StringTable) == 8);
 
-struct MobType;
-
 struct Value
 {
 	Value()
@@ -204,21 +207,6 @@ struct ObjPathTable
 
 static_assert(sizeof(ObjPathTable) == 8);
 
-// TODO: What really is this?
-struct MobType
-{
-	Ref<ObjPath> obj_path;
-	char unk_0[0xC];
-};
-
-static_assert(sizeof(MobType) == 16);
-
-struct MobTypeTable
-{
-	VPtr<MobType> elements;
-	uint32_t count;
-};
-
 // TODO: Might actually be more specific (VariableTableEntry?)
 struct Variable
 {
@@ -241,148 +229,6 @@ struct VariableTable
 
 static_assert(sizeof(VariableTable) == 8);
 
-struct MobFields;
-
-void SetupMobFieldGetters();
-
-struct Mob
-{
-	enum class Flags : uint16_t
-	{
-		SeeInfrared,
-	};
-
-	Value loc;
-	char unk_0_0[0x8];
-	uint16_t bound_x;
-	uint16_t bound_y;
-	uint16_t bound_width;
-	uint16_t bound_height;
-	float step_x;
-	float step_y;
-	float step_size;
-	VPtr<uint32_t> unk_1;
-	VariableTable variables;
-	uint8_t dir;
-	uint8_t unk_2_0;
-	uint16_t pixel_x;
-	uint16_t pixel_y;
-	uint16_t pixel_w;
-	uint16_t pixel_z;
-	VPtr<uint32_t> unk_3;
-	VPtr<uint32_t> unk_4;
-	VPtr<uint32_t> unk_5;
-	char unk_6[0x8];
-	Ref<MobFields> fields;
-	char unk_7[0x3C];
-	Ref<String> key;
-	Ref<String> ckey;
-	Ref<ObjPath> path;
-	Ref<MobType> mob_type;
-	char unk_8[0x8];
-	VPtr<uint32_t> unk_9;
-	char unk_10[0x4];
-	uint16_t client_index;
-	uint16_t unk_11;
-	uint16_t sight;
-	Flags flags;
-	uint8_t see_in_dark;
-	uint8_t see_invisible;
-	uint8_t unk_14;
-	uint8_t unk_15;
-
-	static Value getType(Ref<Mob> ref);
-	static Value getVerbs(Ref<Mob> ref);
-	static Value getLoc(Ref<Mob> ref);
-	static Value getX(Ref<Mob> ref);
-	static Value getY(Ref<Mob> ref);
-	static Value getZ(Ref<Mob> ref);
-	static Value getDir(Ref<Mob> ref);
-	static Value getSight(Ref<Mob> ref);
-	static Value getClient(Ref<Mob> ref);
-	static Value getKey(Ref<Mob> ref);
-	static Value getCKey(Ref<Mob> ref);
-	static Value getGroup(Ref<Mob> ref);
-	static Value getContents(Ref<Mob> ref);
-	static Value getTag(Ref<Mob> ref); 
-	static Value getVars(Ref<Mob> ref);
-	static Value getOverlays(Ref<Mob> ref);
-	static Value getUnderlays(Ref<Mob> ref);
-	static Value getParentType(Ref<Mob> ref);
-	static Value getSeeInDark(Ref<Mob> ref);
-	static Value getSeeInvisible(Ref<Mob> ref);
-	static Value getSeeInfrared(Ref<Mob> ref);
-	static Value getPixelX(Ref<Mob> ref);
-	static Value getPixelY(Ref<Mob> ref);
-	static Value getPixelW(Ref<Mob> ref);
-	static Value getPixelStepSize(Ref<Mob> ref);
-	static Value getPixelZ(Ref<Mob> ref);
-	static Value getLocs(Ref<Mob> ref);
-	static Value getStepX(Ref<Mob> ref);
-	static Value getStepY(Ref<Mob> ref);
-	static Value getStepSize(Ref<Mob> ref);
-	static Value getBoundX(Ref<Mob> ref);
-	static Value getBoundY(Ref<Mob> ref);
-	static Value getBoundWidth(Ref<Mob> ref);
-	static Value getBoundHeight(Ref<Mob> ref);
-	static Value getGlideSize(Ref<Mob> ref);
-	static Value getVisContents(Ref<Mob> ref);
-	static Value getVisLocs(Ref<Mob> ref);
-	static Value getFilters(Ref<Mob> ref);
-	static Value getTransform(Ref<Mob> ref);
-	static Value getAlpha(Ref<Mob> ref);
-	static Value getColor(Ref<Mob> ref);
-	static Value getBlendMode(Ref<Mob> ref);
-	static Value getAppearance(Ref<Mob> ref);
-	static Value getPlane(Ref<Mob> ref);
-	static Value getAppearanceFlags(Ref<Mob> ref);
-	static Value getName(Ref<Mob> ref);
-	static Value getDesc(Ref<Mob> ref);
-	static Value getSuffix(Ref<Mob> ref);
-	static Value getScreenLoc(Ref<Mob> ref);
-	static Value getText(Ref<Mob> ref);
-	static Value getIcon(Ref<Mob> ref);
-	static Value getIconState(Ref<Mob> ref);
-	static Value getDensity(Ref<Mob> ref);
-	static Value getOpacity(Ref<Mob> ref);
-	static Value getGender(Ref<Mob> ref);
-	static Value getMouseDropZone(Ref<Mob> ref);
-	static Value getAnimateMovement(Ref<Mob> ref);
-	static Value getMouseOpacity(Ref<Mob> ref);
-	static Value getOverride(Ref<Mob> ref);
-	static Value getInvisibility(Ref<Mob> ref);
-	static Value getInfraLuminosity(Ref<Mob> ref);
-	static Value getLuminosity(Ref<Mob> ref);
-	static Value getLayer(Ref<Mob> ref);
-	static Value getMapText(Ref<Mob> ref);
-	static Value getMapTextX(Ref<Mob> ref);
-	static Value getMapTextY(Ref<Mob> ref);
-	static Value getMapTextWidth(Ref<Mob> ref);
-	static Value getMapTextHeight(Ref<Mob> ref);
-	static Value getMouseOverPointer(Ref<Mob> ref);
-	static Value getMouseDragPointer(Ref<Mob> ref);
-	static Value getMouseDropPointer(Ref<Mob> ref);
-	static Value getRenderSource(Ref<Mob> ref);
-	static Value getRenderTarget(Ref<Mob> ref);
-	static Value getVisFlags(Ref<Mob> ref);
-
-	static std::optional<Value> GetField(Ref<Mob> ref, Ref<String> name);
-	static std::optional<Value> GetInitialField(Ref<Mob> ref, Ref<String> name);
-	static std::optional<Value> GetGlobalField(Ref<Mob> ref, Ref<String> name);
-};
-
-static const size_t p = offsetof(Mob, pixel_z);
-
-static_assert(sizeof(Mob) == 188);
-
-// Lots of things use this structure - could abstract it?
-struct MobTable
-{
-	VPtr<VPtr<Mob>> elements;
-	uint32_t length;
-};
-
-static_assert(sizeof(MobTable) == 8);
 
 // wtf is going on down here
 
@@ -394,147 +240,12 @@ enum class Gender
 	Plural
 };
 
-struct MobFields
-{
-	enum class Flags : uint32_t
-	{
-		Opacity = 0x01,
-		Density = 0x02,
-		Visibility = 0x04, // What is atom.visibility?
-		GenderFlags = 0xC0, // A 2-bit index to `Gender` enum
-		MouseDropZone = 0x100,
-		MouseOpacity = 0x3000,
-		AnimateMovement = 0xC000,
-		Override = 0x40000,
-	};
-
-	char unk_0[0x1c];
-	Ref<String> name;
-	Ref<String> desc;
-	Ref<String> suffix;
-	Ref<String> screen_loc;
-	Ref<String> text;
-	uint32_t icon;
-	Ref<String> icon_state;
-	uint32_t unk_2;
-	uint32_t unk_3;
-	uint32_t unk_4;
-	uint32_t unk_5;
-	Flags flags; // todo
-	uint8_t unk_7;
-	uint8_t invisibility;
-	uint8_t infra_luminosity;
-	uint8_t luminosity;
-	uint32_t unk_8;
-	uint32_t unk_9;
-	uint32_t unk_10;
-	float layer;
-	Ref<String> maptext;
-	uint16_t maptext_x;
-	uint16_t maptext_y;
-	uint16_t maptext_width; // (special behaviour)
-	uint16_t maptext_height; // (special behaviour)
-	Value mouse_over_pointer;
-	Value mouse_drag_pointer;
-	Value mouse_drop_pointer;
-	char unk_11[0x34];
-	Ref<String> render_source;
-	Ref<String> render_target;
-	uint16_t vis_flags;
-
-	// TODO: transform is in here somewhere
-	// TODO: size unknown
-
-	/*
-	*type // 25
-	*name // 27
-	*desc // 28
-	*suffix // 29
-	*text // 2a
-	*icon // 2b
-	*icon_state // 2c
-	?visibility // 2d
-	*luminosity // 2e
-	*opacity // 2f
-	*density // 30
-	*verbs // 31
-
-	*loc // 32
-	*x // 33
-	*y // 34
-	*z // 35
-	*dir // 3a
-	*gender // 43
-	*sight // 44
-	*client // 45
-	*key // 46
-	*ckey // 47
-	*group // 48
-	*contents // 49
-	*tag // 55
-	*vars // 5e
-	*overlays // 62
-	*underlays // 63
-	*layer // 73
-	*parent_type // 82
-	*mouse_over_pointer // 94
-	*mouse_drag_pointer // 95
-	*mouse_drop_pointer // 96
-	*mouse_drop_zone // 97
-	*animate_movement // a5
-	*screen_loc // a9
-	*see_in_dark // b3
-	*infra_luminosity // b4
-	*invisibility // b5
-	*see_invisible // b6
-	*see_infrared // b7
-	*mouse_opacity // b8
-	*pixel_x // bb
-	*pixel_y // bc
-	*pixel_step_size // bd
-	*pixel_z // da
-	*_override // db
-	*bounds // dd
-	*locs // de
-	*step_x // df
-	*step_y // e0
-	*step_size // e1
-	*bound_x // e2
-	*bound_y // e3
-	*bound_width // e4
-	*bound_height // e5
-	*glide_size // eb
-	*maptext // ec
-	*maptext_width // ed
-	*maptext_height // ee
-	transform // f0
-	alpha // f1
-	color // f2
-	blend_mode // fe
-	appearance // 106
-	*maptext_x // 10b
-	*maptext_y // 10c
-	plane // 10d
-	appearance_flags // 10e
-	*pixel_w // 117
-	*vis_contents // 119
-	*vis_locs // 11a
-	*filters // 11c
-	*render_source // 129
-	*render_target // 12a
-	*vis_flags // 12b
-	*/
-};
-
 struct SomeGlobals
 {
 	char unk_0[0x40];
 	VPtr<VPtr<MobFields>> mob_fields;
 	uint32_t mob_fields_count;
 };
-
-static const size_t x = offsetof(MobFields, flags);
-
 
 struct ExecutionContext;
 struct Proc;
