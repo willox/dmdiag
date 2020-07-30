@@ -12,10 +12,13 @@
 
 // Mmmm
 
+namespace dm
+{
+
 template<typename T>
 class VPtr;
 
-class ELF_File
+class ELF_Provider
 {
 private:
 	struct Header
@@ -89,10 +92,10 @@ private:
 	};
 
 public:
-	static ELF_File Parse(const char* path);
+	static ELF_Provider Parse(const char* path);
 
 public:
-	ELF_File(std::vector<std::byte> in_buffer);
+	ELF_Provider(std::vector<std::byte> in_buffer);
 
 	std::byte* Translate(uint32_t pointer, uint32_t size);
 
@@ -138,3 +141,5 @@ private:
 
 	std::vector<std::pair<uint32_t, uint32_t>> regions;
 };
+
+}

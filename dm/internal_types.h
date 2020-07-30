@@ -112,7 +112,7 @@ struct Ref
 	uint32_t index;
 	T* get();
 
-	// Only for T = String
+	// Only for T = String/VarName
 	const char* string();
 
 	bool operator==(const Ref<T>& rhs) const
@@ -125,7 +125,7 @@ struct Ref
 		return index != rhs.index;
 	}
 
-	// is this valid for all refs?
+	// is this the same for all refs? Specialize it if not
 	static Ref<T> Invalid() { return {0xFFFF}; }
 };
 static_assert(sizeof(Ref<void>) == 4);

@@ -1,6 +1,9 @@
 #include "elf.h"
 
-ELF_File ELF_File::Parse(const char* path)
+namespace dm
+{
+
+ELF_Provider ELF_Provider::Parse(const char* path)
 {
 	std::ifstream stream(path, std::ios::binary | std::ios::ate);
 	auto size = stream.tellg();
@@ -28,7 +31,7 @@ ELF_File ELF_File::Parse(const char* path)
 	return {std::move(buffer)};
 }
 
-ELF_File::ELF_File(std::vector<std::byte> in_buffer)
+ELF_Provider::ELF_Provider(std::vector<std::byte> in_buffer)
 	: buffer(std::move(in_buffer))
 {
 	std::byte* base = buffer.data();
@@ -68,7 +71,7 @@ ELF_File::ELF_File(std::vector<std::byte> in_buffer)
 }
 
 // Easy optimizations here
-std::byte* ELF_File::Translate(uint32_t pointer, uint32_t size)
+std::byte* ELF_Provider::Translate(uint32_t pointer, uint32_t size)
 {
 	if (pointer + size < pointer)
 		return nullptr;
@@ -101,7 +104,7 @@ std::byte* ELF_File::Translate(uint32_t pointer, uint32_t size)
 	return nullptr;
 }
 
-std::byte* ELF_File::Read(uint32_t offset, uint32_t size)
+std::byte* ELF_Provider::Read(uint32_t offset, uint32_t size)
 {
 	std::byte* base = buffer.data();
 	size_t buffer_size = buffer.size();
@@ -117,7 +120,7 @@ std::byte* ELF_File::Read(uint32_t offset, uint32_t size)
 }
 
 // fixups needed here
-std::optional<std::vector<std::pair<uint32_t, uint32_t>>> ELF_File::FindRegions()
+std::optional<std::vector<std::pair<uint32_t, uint32_t>>> ELF_Provider::FindRegions()
 {
 	for (auto& ph : program_headers)
 	{
@@ -196,4 +199,6 @@ std::optional<std::vector<std::pair<uint32_t, uint32_t>>> ELF_File::FindRegions(
 	}
 
 	return std::nullopt;
+}
+
 }

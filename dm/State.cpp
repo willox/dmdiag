@@ -7,10 +7,20 @@ namespace dm
 State* current_state = nullptr;
 
 State::State(const char* path)
-	: _file(ELF_File::Parse(path))
+	: _file(ELF_Provider::Parse(path))
 	, _string_table(nullptr)
 	, _current_execution_context(nullptr)
 	, _mob_table(nullptr)
+	, _mobtype_table(nullptr)
+	, _varname_table(nullptr)
+	, _value_table(nullptr)
+	,  _obj_path_table(nullptr)
+	, _misc_table(nullptr)
+	, _someglobals(nullptr)
+	, _proc_table(nullptr)
+	, _sleeper_buffer(nullptr)
+	, _sleeper_front(0)
+	, _sleeper_back(0)
 {
 	current_state = this;
 
@@ -26,8 +36,11 @@ State::State(const char* path)
 	auto* pObjPathTable = _file.Scan<VPtr<ObjPathTable>>("\x8B\x1D????\x01\xD9\x89\x4D?\x8B\x0D????\x8D\x04?\x89\x45?\x8B\x5D?"sv, 2);
 	auto* pMiscTable = _file.Scan<VPtr<MiscTable>>("\x8B\x15????\x8B\x04?\x85\xC0\x0F\x84????\x8B\x78?\x0F\xB7\x00\x66\x85\xC0"sv, 2);
 	auto* ppSomeGlobals = _file.Scan<VPtr<VPtr<SomeGlobals>>>("\xA1????\x85\xC0\x0F\x84????\x8B\x40?\x85\xC0\x0F\x84????"sv, 1);
-	auto* ppSleeperBuffer = _file.Scan<VPtr<VPtr<VPtr<ProcInstance>>>>("\xA1????\xC7\x44\x24?\x26\x00\x00\x00\x8B\x04?\x8B\x00\x89\x34\x24\x89\x44\x24?"sv, 1);
 	auto* pProcTable = _file.Scan<VPtr<ProcTable>>("\x03\x05????\x8B\x4D?\x8B\x40?\x89\x45?\x0F\xB7\x59?\x8B\x31\x0F\xB7\xCB"sv, 2);
+
+	auto* ppSleeperBuffer = _file.Scan<VPtr<VPtr<VPtr<ProcInstance>>>>("\xA1????\x8B\x04?\x39\xC6\x75?\x8B\x86????\x85\xC0\x75?\x83\x3D????\xFF"sv, 1);
+	auto* pSleeperFront = _file.Scan<VPtr<uint32_t>>("\x8B\x15????\x31\xC0\x3B\x15????\x72?\x39\xC6\x74?\x80\x3B\x0C\xC7\x43?\x00\x00\x00\x00"sv, 2);
+	auto* pSleeperBack = _file.Scan<VPtr<uint32_t>>("\x3B\x15????\x72?\x39\xC6\x74?\x80\x3B\x0C\xC7\x43?\x00\x00\x00\x00\x76"sv, 2);
 
 	if (pStringTable)
 	{
@@ -75,14 +88,16 @@ State::State(const char* path)
 		_someglobals = (*ppSomeGlobals)->get();
 	}
 
-	if (ppSleeperBuffer)
-	{
-		_sleeper_buffer = (*ppSleeperBuffer)->get();
-	}
-
 	if (pProcTable)
 	{
 		_proc_table = pProcTable->get();
+	}
+
+	if (ppSleeperBuffer && pSleeperFront && pSleeperBack)
+	{
+		_sleeper_buffer = (*ppSleeperBuffer)->get();
+		_sleeper_front = pSleeperFront->get();
+		_sleeper_back = pSleeperBack->get();
 	}
 
 	return;

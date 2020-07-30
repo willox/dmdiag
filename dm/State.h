@@ -36,7 +36,7 @@ private:
 	void LoadStrings();
 
 public:
-	ELF_File _file;
+	ELF_Provider _file;
 	StringTable* _string_table;
 	ExecutionContext* _current_execution_context;
 	MobTable* _mob_table;
@@ -49,6 +49,8 @@ public:
 	ProcTable* _proc_table;
 
 	VPtr<ProcInstance>* _sleeper_buffer;
+	uint32_t* _sleeper_front;
+	uint32_t* _sleeper_back;
 
 	std::vector<const char*> _strings;
 	std::map<std::string, Ref<String>> _string_refs;
