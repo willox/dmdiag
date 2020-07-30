@@ -130,7 +130,7 @@ const char* State::GetString(uint32_t index)
 
 Ref<String>* State::GetStringRef(const char* string)
 {
-	auto& x = _string_refs.find({string});
+	auto x = _string_refs.find({string});
 	if (x != _string_refs.end())
 	{
 		return &x->second;

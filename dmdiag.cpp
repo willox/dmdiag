@@ -1,13 +1,13 @@
 #include "dm/dm.h"
 #include <iostream>
-
+#include <string.h>
 #include <string>
 
 int main(int argc, char** argv)
 {
 	if (argc < 2)
 	{
-		std::cout << "pass path to Linux 513.1257 dump as arg 1";
+		std::cout << "pass path to Linux 513.1257 dump as arg 1\n";
 		return 0;
 	}
 
