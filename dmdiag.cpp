@@ -9,8 +9,9 @@
 #include "sqstdstring.h"
 #include "sqstdsystem.h"
 #include <string>
+#include <stack>
 
-static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.80099";
+static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\unordered.dump";
 //static const char dump_path[] = "C:\\Users\\wwall\\Downloads\\Dump\\core.10813";
 
 static dm::ProcInstance* current_frame = nullptr;
@@ -182,9 +183,175 @@ SQInteger GetField_Mob(HSQUIRRELVM v)
 	return 1;
 }
 
+static dm::String* FindString(dm::VPtr<dm::String> start, const char* string)
+{
+	auto current = start.get();
+	while (true)
+	{
+		if (current == nullptr)
+		{
+			return nullptr;
+		}
+
+		std::cout << "Comparing To: " << current->data.get() << '\n';
+
+		if (current->left)
+		{
+			std::cout << "  Left: " << strcmp(current->data.get(), current->left.get()->data.get()) << " = " << current->left.get()->data.get() << '\n';
+		}
+
+		if (current->right)
+		{
+			std::cout << "  Right: " << strcmp(current->data.get(), current->right.get()->data.get()) << " = " << current->right.get()->data.get() << '\n';
+		}		
+
+		auto cmp = strcmp(string, current->data.get());
+		if (cmp == 0)
+		{
+			return current;
+		}
+		if (cmp < 1)
+		{
+			current = current->left.get();
+		}
+		else
+		{
+			current = current->right.get();
+		}
+	}
+	return current;
+}
+
+static void Visit(dm::VPtr<dm::String> str, std::vector<dm::String*>& parents, uint32_t depth = 0)
+{
+	int diff = 0;
+
+	std::cout << "/" << str->data.get() << '\n' << '\n';
+	dm::String* current = str.get();
+	if (current->left)
+	{
+		std::cout << "  Left: " << strcmp(current->data.get(), current->left.get()->data.get()) << " = " << current->left.get()->data.get() << '\n';
+	}
+
+	if (current->right)
+	{
+		std::cout << "  Right: " << strcmp(current->data.get(), current->right.get()->data.get()) << " = " << current->right.get()->data.get() << '\n';
+	}		
+
+
+	if (str->left)
+	{
+		parents.push_back(str.get());
+		Visit(str->left, parents, depth + 1);
+		parents.pop_back();
+	}
+
+	for (auto& x : parents )
+	{
+		//std:: cout << "/{" << ( x->data ? x->data.get() : "<nullptr>" ) << "}";
+	}
+
+	//std::cout << "/" << str->data.get() << '\n' << '\n';
+
+	if (str->right)
+	{
+		parents.push_back(str.get());
+		Visit(str->right, parents, depth + 1);
+		parents.pop_back();
+	}
+}
+
+dm::String* FindParent(dm::State& state, dm::String* str)
+{
+	for (uint32_t i = 0; i < state._string_table->size; i++)
+	{
+		dm::String* parent = state._string_table->strings[i].get();
+		if (parent && (parent->left.get() == str || parent->right.get() == str))
+		{
+			return parent;
+		}
+	}
+
+	return nullptr;
+}
+
 int main(int argc, char** argv)
 {
 	dm::State state(dump_path);
+
+	/*
+	for (uint32_t i = 0; i < state._string_table->size; i++)
+	{
+		dm::String* str = state._string_table->strings[i].get();
+		if (str && str->data && strcmp(str->data.get(), "hourglass_idle") == 0)
+		{
+			dm::String* parent = FindParent(state, str);
+			const char* data = parent->data.get();
+			continue;
+		}
+	}
+	*/
+
+	//auto x = FindString(state._string_table->strings[0], "hourglass_idle");
+
+	//std::vector<dm::String*> parents;
+	//Visit(state._string_table->strings[0], parents);
+	//return 0;
+
+	/*
+	std::vector<const char*> instances;
+	for (uint32_t i = 0; i < state._string_table->size; i++)
+	{
+		dm::String* str = state._string_table->strings[i].get();
+		if (str && str->data && strcmp(str->data.get(), "hourglass_idle") == 0)
+		{
+			instances.push_back(str->data.get());
+		}
+	}
+
+	return 0;
+	*/
+
+/*	
+	auto str = FindString(state._string_table->strings[0], "hourglass_idle");
+	auto data = str->data.get();
+
+	auto left = str->left.get();
+	auto right = str->right.get();
+
+	Visit(state._string_table->strings[0]);
+	return 0;
+	*/
+
+	/*
+	for (uint32_t i = 0; i < state._string_table->size; i++)
+	{
+		
+		if (!strptr)
+			continue;
+		auto& str = *strptr;
+		const char* a = str.data.get();
+		const char* b = nullptr;
+		const char* c = nullptr;
+		if (str.left.get())
+		{
+			b = str.left->data.get();
+		}
+		else
+		{
+			continue;
+		}
+		if (str.right.get())
+		{
+			c = str.right->data.get();
+		}
+		else
+		{
+			continue;
+		}
+		continue;
+	}
+	*/
 
 	// TODO: remove
 	dm::SetupMobFieldGetters();

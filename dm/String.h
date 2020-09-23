@@ -8,9 +8,9 @@ namespace dm
 struct String
 {
 	VPtr<char> data;
-	uint32_t unk_0;
-	uint32_t unk_1;
-	uint32_t reference_count;
+	Ref<String> self;
+	VPtr<String> left;
+	VPtr<String> right;
 	uint32_t unk_2;
 	uint32_t unk_3;
 	uint32_t unk_4;
