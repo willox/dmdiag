@@ -1,0 +1,11 @@
+[package]
+name = "dmdiag"
+version = "0.1.0"
+authors = ["William Wallace <me@wiox.me>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+unicorn = { path = "E:/unicorn/bindings/rust", version="1.0.0" }
+minidump = { path = "E:/rust-minidump/minidump", version = "0.3.0" }
