@@ -7,7 +7,7 @@ use std::ffi::OsStr;
 use std::ops::Deref;
 
 use unicorn::unicorn_const::{Arch, HookType, Mode, Permission, SECOND_SCALE};
-use unicorn::{RegisterX86, X86Mmr};
+use unicorn::{RegisterX86, UnicornHandle, X86Mmr};
 
 use minidump::{Minidump, MinidumpMemory, MinidumpMemoryList, MinidumpModuleList};
 
@@ -40,14 +40,73 @@ where
     None
 }
 
+fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: usize) -> bool {
+    let target_range = ptr..(ptr + size as u64);
+    let mut did_map = false;
+
+    for page in pages.iter() {
+        let range = page.base_address..(page.base_address + page.size);
+        if target_range.start < range.end && range.start < target_range.end {
+            println!("MAPPING {:X} -> {:x}", page.base_address, page.base_address + page.size);
+
+            emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
+                .expect("failed to map page");
+    
+            emu.mem_write(page.base_address, page.bytes)
+                .expect("failed to write page");
+
+            did_map = true;
+        }
+    }
+
+    did_map
+}
+
 fn main() {
     let mut unicorn = unicorn::Unicorn::new(Arch::X86, Mode::MODE_32)
         .expect("failed to initialize Unicorn instance");
 
     let mut emu = unicorn.borrow();
 
-    emu.add_mem_hook(HookType::MEM_ALL, 0, 0xFFFFFFFFFFFFFFFF, |x, a, b, c, d| {
-        println!("HOOK! {:?}, {:x}, {}, {}", a, b, c, d);
+    let dump = minidump::Minidump::read_path("E:/dmdiag/tgstation.dmp").unwrap();
+    let dump = Box::new(dump);
+    let dump = Box::leak(dump);
+    let pages: MinidumpMemoryList = dump.get_stream().unwrap();
+    let pages = Box::new(pages);
+    let pages = Box::leak(pages);
+
+    // Find get_variable
+    let (byond_core_start, byond_core_size) = find_byond_core(&dump).unwrap();
+
+    assert!(try_map(&mut emu, &pages, byond_core_start, byond_core_size));
+
+    let byond_core = emu
+        .mem_read_as_vec(byond_core_start, byond_core_size)
+        .unwrap();
+    let get_variable = byond_core_start
+        + sigscan::find(
+            &byond_core,
+            &[
+                Some(0x55), Some(0x8B), Some(0xEC), Some(0x8B), Some(0x4D), None, Some(0x0F), Some(0xB6), Some(0xC1), Some(0x48), Some(0x83), Some(0xF8), None, Some(0x0F), Some(0x87), None, None, None, None, Some(0x0F), Some(0xB6), Some(0x80), None, None, None, None, Some(0xFF), Some(0x24), Some(0x85), None, None, None, None, Some(0xFF), Some(0x75), None, Some(0xFF), Some(0x75), None, Some(0xE8)
+            ],
+        )
+        .unwrap() as u64;
+    let get_string_id = byond_core_start
+        + sigscan::find(
+            &byond_core,
+            &[
+                Some(0x55), Some(0x8B), Some(0xEC), Some(0x8B), Some(0x45), None, Some(0x83), Some(0xEC), None, Some(0x53), Some(0x56), Some(0x8B), Some(0x35), None, None, None, None, Some(0x57), Some(0x85), Some(0xC0), Some(0x75), None, Some(0x68), None, None, None, None,
+            ],
+        )
+        .unwrap() as u64;
+
+    // emu.add_mem_hook(HookType::MEM_ALL, 0, 0xFFFFFFFFFFFFFFFF, |x, a, b, c, d| {
+    //     println!("HOOK! {:?}, {:x}, {}, {}", a, b, c, d);
+    // })
+    // .unwrap();
+
+    emu.add_mem_invalid_hook(HookType::MEM_INVALID, 0, 0xFFFFFFFFFFFFFFFF, move |mut x, a, b, c, d| {
+        try_map(&mut x, &pages, b, c)
     })
     .unwrap();
 
@@ -64,16 +123,16 @@ fn main() {
     })
     .unwrap();
 
-    let dump = minidump::Minidump::read_path("E:/dmdiag/dreamdaemon.dmp").unwrap();
-    let pages: MinidumpMemoryList = dump.get_stream().unwrap();
 
-    for page in pages.iter() {
-        emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
-            .expect("failed to map page");
 
-        emu.mem_write(page.base_address, page.bytes)
-            .expect("failed to write page");
-    }
+    // for page in pages.iter() {
+    //     println!("Mapping {:x} {:X}", page.base_address, page.size);
+    //     emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
+    //         .expect("failed to map page");
+// 
+    //     emu.mem_write(page.base_address, page.bytes)
+    //         .expect("failed to write page");
+    // }
 
     //
     // Stack
@@ -126,37 +185,32 @@ fn main() {
     emu.mem_write(TIB_ADDRESS + 0x18, &(TIB_ADDRESS as u32).to_le_bytes())
         .unwrap();
 
-    // Find get_variable
-    let (byond_core_start, byond_core_size) = find_byond_core(&dump).unwrap();
-    let byond_core = emu
-        .mem_read_as_vec(byond_core_start, byond_core_size)
+    emu.mem_write(0x80000100, b"pparent_type\0")
         .unwrap();
-    let get_variable = byond_core_start
-        + sigscan::find(
-            &byond_core,
-            &[
-                Some(0x55), Some(0x8B), Some(0xEC), Some(0x8B), Some(0x4D), None, Some(0x0F), Some(0xB6), Some(0xC1), Some(0x48), Some(0x83), Some(0xF8), None, Some(0x0F), Some(0x87), None, None, None, None, Some(0x0F), Some(0xB6), Some(0x80), None, None, None, None, Some(0xFF), Some(0x24), Some(0x85), None, None, None, None, Some(0xFF), Some(0x75), None, Some(0xFF), Some(0x75), None, Some(0xE8)
-            ],
-        )
-        .unwrap() as u64;
+// 
+    // StackOp::push(&0x00000001, &mut emu); // Unimportant flag params for get_string_id
+    // StackOp::push(&0x00000000, &mut emu); // Unimportant flag params for get_string_id
+    // StackOp::push(&0x00000000, &mut emu); // Unimportant flag params for get_string_id
+    // StackOp::push(&0x80000100, &mut emu); // String ptr
+    // StackOp::push(&0x00000000, &mut emu); // Return address (we'll handle the crash)
+// 
+    // let _ = emu.emu_start(get_string_id, 0, 10 * SECOND_SCALE, 16000);
+// 
 
     // Setup stack for call
     StackOp::push(&0x00000082, &mut emu);   // String id for `parent_type`
     StackOp::push(&value::Value {
-        kind: 0x21,
-        data: 0x00,
+        kind: 0x02,
+        data: 0x1401,
     }, &mut emu);                           // Reference of my testing datum
     StackOp::push(&0x00000000, &mut emu);   // Return address (we'll handle the crash)
-
     let _ = emu.emu_start(get_variable, 0, 10 * SECOND_SCALE, 16000);
 
     let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap();
     let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap();
 
-    let value = Value {
-        kind: eax as u8,
-        data: edx as u32,
-    };
-
-    println!("parent_type is {:?}", value);
+    println!("{:x?} {:x?}", eax, edx);
 }
+
+
+
