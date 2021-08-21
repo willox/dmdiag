@@ -32,18 +32,20 @@ const TIB_SIZE: usize = 0x1000;
 struct ByondEmulator {
     unicorn: Unicorn,
 
-    // Our state needs to be shared with hooks that may be run while unicorn is borrowed
+    // addresses of byond functions
+    functions: functions::Functions,
+
+    // state that needs to be accessed & mutated within unicorn hooks
     state: Rc<RefCell<ByondState>>,
 }
 
 struct ByondState {
-    dump: minidump::Minidump<'static, minidump::Mmap>,
+    dump: minidump::Minidump<'static, minidump::Mmap>, // 🤔
 
     // base addresses of memory regions that have already been mapped in
     mapped: HashSet<u64>,
 
-    // addresses of byond functions
-    functions: functions::Functions,
+
 }
 
 impl ByondEmulator {
@@ -55,10 +57,10 @@ impl ByondEmulator {
 
         let mut this = Self {
             unicorn,
+            functions: Default::default(),
             state: Rc::new(RefCell::new(ByondState {
                 dump,
                 mapped: HashSet::new(),
-                functions: Default::default(),
             })),
         };
 
@@ -131,7 +133,7 @@ impl ByondEmulator {
 
 
             // Kind of... bad
-            this.state.borrow_mut().functions = functions::Functions::new(&mut this);
+            this.functions = functions::Functions::new(&mut this);
         }
 
         this
@@ -258,11 +260,9 @@ fn main() {
     }); // Reference of my testing datum
     dump.stack_push(0x00000000); // Return address (we'll handle the crash)
 
-    let functions = dump.state.borrow().functions.clone();
-
     let mut emu = dump.unicorn.borrow();
     let _ = emu.emu_start(
-        functions.to_string.unwrap(),
+        dump.functions.to_string.unwrap(),
         0,
         10 * SECOND_SCALE,
         16000,
@@ -276,7 +276,7 @@ fn main() {
 
     let mut emu = dump.unicorn.borrow();
     let _ = emu.emu_start(
-        functions.get_string_table_entry.unwrap(),
+        dump.functions.get_string_table_entry.unwrap(),
         0,
         10 * SECOND_SCALE,
         16000,
