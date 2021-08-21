@@ -18,7 +18,7 @@ pub struct StringEntry {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Value {
     pub kind: u8,
     pub data: u32,

@@ -253,6 +253,32 @@ impl ByondEmulator {
         String::from_utf8_lossy(&characters).to_string()
     }
 
+    fn get_string_id(&mut self, string: &str) -> StringId {
+        self.stack_clear();
+        self.stack_push(1);
+        self.stack_push(0);
+        self.stack_push(0);
+        self.stack_push(STACK_ADDRESS as u32 + 0x100);
+        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+
+        let mut emu = self.unicorn.borrow();
+        emu.mem_write(STACK_ADDRESS + 0x100, string.as_bytes())
+            .unwrap();
+        emu.mem_write(STACK_ADDRESS + 0x100 + string.len() as u64, &[0])
+            .unwrap();
+
+        // TODO: Actually check for success
+        let _ = emu.emu_start(
+            self.functions.get_string_id.unwrap(),
+            0,
+            10 * SECOND_SCALE,
+            16000,
+        );
+        
+
+        StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32)
+    }
+
     fn to_string(&mut self, val: Value) -> String {
         self.stack_clear();
         self.stack_push(val);
@@ -272,7 +298,34 @@ impl ByondEmulator {
 
         let string_table_entry = self.get_string_table_entry(id);
         self.read_null_terminated_string(string_table_entry.data)
-    }    
+    }
+
+    fn get_field(&mut self, val: Value, field: &str) -> Value {
+        let field = self.get_string_id(field);
+
+        self.stack_clear();
+        self.stack_push(field.0);
+        self.stack_push(val);
+        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+
+        let mut emu = self.unicorn.borrow();
+
+        // TODO: Actually check for success
+        let _ = emu.emu_start(
+            self.functions.get_variable.unwrap(),
+            0,
+            10 * SECOND_SCALE,
+            16000,
+        );
+
+        let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32;
+        let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap() as u32;
+
+        Value {
+            kind: eax as u8,
+            data: edx,
+        }
+    }
 }
 
 fn find_byond_core<T>(dump: &Minidump<T>) -> Option<(u64, usize)>
@@ -313,8 +366,22 @@ fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: 
 fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
-    println!("str = {}", dump.to_string(Value {
+    println!("[0x2001401] = {}", dump.to_string(Value {
         kind: 0x02,
         data: 0x1401,
     }));
+
+    println!("[0x2001412] = {}", dump.to_string(Value {
+        kind: 0x02,
+        data: 0x1412,
+    }));
+
+    let mannitol_pill = Value {
+        kind: 0x02,
+        data: 0x1423,
+    };
+
+    println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
+    let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
+    println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
 }
