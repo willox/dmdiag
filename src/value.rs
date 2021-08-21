@@ -1,4 +1,4 @@
-use crate::stack_op::{StackOp};
+use crate::stack_op::StackOp;
 use unicorn::UnicornHandle;
 
 #[derive(Debug)]
@@ -17,6 +17,9 @@ impl StackOp for Value {
         let kind: u32 = StackOp::pop(emu);
         let data: u32 = StackOp::pop(emu);
 
-        Value { kind: kind as u8, data }
+        Value {
+            kind: kind as u8,
+            data,
+        }
     }
 }
