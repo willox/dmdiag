@@ -1,9 +1,8 @@
-mod byond;
+mod structures;
 mod functions;
 mod gdt;
 mod sigscan;
 mod stack_op;
-mod value;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -14,13 +13,14 @@ use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
 
+use structures::{StringEntry, StringId};
 use unicorn::unicorn_const::{Arch, HookType, Mode, Permission, SECOND_SCALE};
 use unicorn::{RegisterX86, Unicorn, UnicornHandle, X86Mmr};
 
 use minidump::{Minidump, MinidumpMemory, MinidumpMemoryList, MinidumpModuleList};
 
 use crate::stack_op::StackOp;
-use crate::value::Value;
+use crate::structures::Value;
 
 // TODO: dynamic allocations for all of these
 const STACK_ADDRESS: u64 = 0x80000000;
@@ -35,7 +35,7 @@ struct ByondEmulator {
     // addresses of byond functions
     functions: functions::Functions,
 
-    // state that needs to be accessed & mutated within unicorn hooks
+    // state that is shared with our unicorn hook functions
     state: Rc<RefCell<ByondState>>,
 }
 
@@ -44,8 +44,6 @@ struct ByondState {
 
     // base addresses of memory regions that have already been mapped in
     mapped: HashSet<u64>,
-
-
 }
 
 impl ByondEmulator {
@@ -203,6 +201,78 @@ impl ByondEmulator {
 
         is_mapped
     }
+
+    fn get_string_table_entry(&mut self, id: StringId) -> StringEntry {
+        self.stack_clear();
+        self.stack_push(id.0);
+        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+    
+        let mut emu = self.unicorn.borrow();
+
+        // TODO: Actually check for success
+        let _ = emu.emu_start(
+            self.functions.get_string_table_entry.unwrap(),
+            0,
+            10 * SECOND_SCALE,
+            16000,
+        );
+    
+        let ptr = emu.reg_read(RegisterX86::EAX as i32).unwrap();
+        ByondEmulator::ensure_mapped(&mut emu, &mut self.state.borrow_mut(), ptr, size_of::<structures::StringEntry>());
+
+        let bytes = emu
+            .mem_read_as_vec(ptr, size_of::<structures::StringEntry>())
+            .unwrap();
+    
+        // TODO: not good
+        unsafe {
+            let string_entry: *const structures::StringEntry = bytes.as_ptr() as *const _;
+            (*string_entry).clone()
+        }
+    }
+
+    fn read_null_terminated_string(&mut self, ptr: u32) -> String {
+        let mut ptr = ptr as u64;
+        let mut characters: Vec<u8> = vec![];
+
+        let mut emu = self.unicorn.borrow();
+    
+        loop {
+            let mut char: [u8; 1] = [0];
+            assert!(ByondEmulator::ensure_mapped(&mut emu, &mut self.state.borrow_mut(), ptr, 1));
+            emu.mem_read(ptr, &mut char).unwrap();
+    
+            if char[0] == 0 {
+                break;
+            }
+    
+            characters.push(char[0]);
+            ptr += 1;
+        }
+    
+        String::from_utf8_lossy(&characters).to_string()
+    }
+
+    fn to_string(&mut self, val: Value) -> String {
+        self.stack_clear();
+        self.stack_push(val);
+        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+
+        let mut emu = self.unicorn.borrow();
+
+        // TODO: Actually check for success
+        let _ = emu.emu_start(
+            self.functions.to_string.unwrap(),
+            0,
+            10 * SECOND_SCALE,
+            16000,
+        );
+
+        let id = StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32);
+
+        let string_table_entry = self.get_string_table_entry(id);
+        self.read_null_terminated_string(string_table_entry.data)
+    }    
 }
 
 fn find_byond_core<T>(dump: &Minidump<T>) -> Option<(u64, usize)>
@@ -243,77 +313,8 @@ fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: 
 fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
-    //
-    // StackOp::push(&0x00000001, &mut emu); // Unimportant flag params for get_string_id
-    // StackOp::push(&0x00000000, &mut emu); // Unimportant flag params for get_string_id
-    // StackOp::push(&0x00000000, &mut emu); // Unimportant flag params for get_string_id
-    // StackOp::push(&0x80000100, &mut emu); // String ptr
-    // StackOp::push(&0x00000000, &mut emu); // Return address (we'll handle the crash)
-    //
-    // let _ = emu.emu_start(get_string_id, 0, 10 * SECOND_SCALE, 16000);
-    //
-
-    // Setup stack for call
-    dump.stack_push(value::Value {
+    println!("str = {}", dump.to_string(Value {
         kind: 0x02,
         data: 0x1401,
-    }); // Reference of my testing datum
-    dump.stack_push(0x00000000); // Return address (we'll handle the crash)
-
-    let mut emu = dump.unicorn.borrow();
-    let _ = emu.emu_start(
-        dump.functions.to_string.unwrap(),
-        0,
-        10 * SECOND_SCALE,
-        16000,
-    );
-    let string_index = emu.reg_read(RegisterX86::EAX as i32).unwrap();
-
-    println!("String index = {:x}", string_index);
-
-    dump.stack_push(string_index as u32);
-    dump.stack_push(0x00000000); // Return address (we'll handle the crash)
-
-    let mut emu = dump.unicorn.borrow();
-    let _ = emu.emu_start(
-        dump.functions.get_string_table_entry.unwrap(),
-        0,
-        10 * SECOND_SCALE,
-        16000,
-    );
-
-    let ptr = emu.reg_read(RegisterX86::EAX as i32).unwrap();
-    ByondEmulator::ensure_mapped(&mut emu, &mut dump.state.borrow_mut(), ptr, size_of::<byond::StringEntry>());
-    let mut emu = dump.unicorn.borrow();
-    let bytes = emu
-        .mem_read_as_vec(ptr, size_of::<byond::StringEntry>())
-        .unwrap();
-
-    let mut string_ptr = unsafe {
-        let string_entry: *const byond::StringEntry = bytes.as_ptr() as *const _;
-        println!("{:x?}", *string_entry);
-        (*string_entry).data as u64
-    };
-
-    println!("String ptr = {:x}", string_ptr);
-
-    let mut characters: Vec<u8> = vec![];
-
-    let state = dump.state.borrow();
-    let pages: MinidumpMemoryList = state.dump.get_stream().unwrap();
-
-    loop {
-        let mut char: [u8; 1] = [0];
-        try_map(&mut emu, &pages, string_ptr, 1);
-        emu.mem_read(string_ptr, &mut char).unwrap();
-
-        if char[0] == 0 {
-            break;
-        }
-
-        characters.push(char[0]);
-        string_ptr += 1;
-    }
-
-    println!("GOT STRING! {:?}", String::from_utf8_lossy(&characters));
+    }));
 }
