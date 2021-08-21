@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 unicorn = { path = "E:/unicorn/bindings/rust", version="1.0.0" }
 minidump = { path = "E:/rust-minidump/minidump", version = "0.3.0" }
+zydis = "3.0"

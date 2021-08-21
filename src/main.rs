@@ -122,6 +122,25 @@ impl ByondEmulator {
             {
                 let mut emu = this.unicorn.borrow();
 
+                let formatter = zydis::Formatter::new(zydis::FormatterStyle::INTEL)
+                    .unwrap();
+                let decoder = zydis::Decoder::new(zydis::MachineMode::LONG_COMPAT_32, zydis::AddressWidth::_32)
+                    .unwrap();
+
+                emu.add_code_hook(0, 0xFFFFFFFFFFFFFFFF, move |emu, ptr, len| {
+                    let code = emu.mem_read_as_vec(ptr, len as usize).unwrap();
+
+                    let mut buffer = [0u8; 200];
+                    let mut buffer = zydis::OutputBuffer::new(&mut buffer);
+
+                    let instruction = decoder.decode(&code).unwrap().unwrap();
+                    formatter.format_instruction(&instruction, &mut buffer, Some(ptr), None)
+                        .unwrap();
+
+                    println!("0x{:08X}    {}", ptr, buffer);
+                })
+                .unwrap();
+
                 let state = Rc::clone(&this.state);
                 emu.add_mem_invalid_hook(HookType::MEM_INVALID, 0, 0xFFFFFFFFFFFFFFFF, move |mut emu, a, b, c, d| {
                     Self::ensure_mapped(&mut emu, &mut state.borrow_mut(), b, c)
@@ -213,7 +232,7 @@ impl ByondEmulator {
         let _ = emu.emu_start(
             self.functions.get_string_table_entry.unwrap(),
             0,
-            10 * SECOND_SCALE,
+            0,
             16000,
         );
     
@@ -271,7 +290,7 @@ impl ByondEmulator {
         let _ = emu.emu_start(
             self.functions.get_string_id.unwrap(),
             0,
-            10 * SECOND_SCALE,
+            0,
             16000,
         );
         
@@ -290,7 +309,7 @@ impl ByondEmulator {
         let _ = emu.emu_start(
             self.functions.to_string.unwrap(),
             0,
-            10 * SECOND_SCALE,
+            0,
             16000,
         );
 
@@ -314,7 +333,7 @@ impl ByondEmulator {
         let _ = emu.emu_start(
             self.functions.get_variable.unwrap(),
             0,
-            10 * SECOND_SCALE,
+            0,
             16000,
         );
 
@@ -381,7 +400,11 @@ fn main() {
         data: 0x1423,
     };
 
-    println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
-    let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
-    println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
+    loop {
+        println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
+        let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
+        println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
+
+        println!("dynamic = {:?}", dump.get_string_id("fuckywucky151512"));
+    }
 }

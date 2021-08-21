@@ -95,11 +95,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "dmdiag"
 version = "0.1.0"
 dependencies = [
  "minidump",
  "unicorn",
+ "zydis",
 ]
 
 [[package]]
@@ -467,3 +477,13 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "zydis"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cae82593755d76e8aa27c10281724173717a29b48ae523cb9c5980bc4b4d0a1"
+dependencies = [
+ "bitflags",
+ "cmake",
+]
