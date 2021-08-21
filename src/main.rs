@@ -5,9 +5,10 @@ mod sigscan;
 mod stack_op;
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::ffi::OsStr;
+use std::iter::Map;
 use std::mem::size_of;
 use std::ops::Deref;
 use std::path::Path;
@@ -127,7 +128,29 @@ impl ByondEmulator {
                 let decoder = zydis::Decoder::new(zydis::MachineMode::LONG_COMPAT_32, zydis::AddressWidth::_32)
                     .unwrap();
 
+                emu.add_insn_invalid_hook(|mut emu| {
+                    let rip = emu.reg_read(RegisterX86::EIP as i32).unwrap();
+                    let code = emu.mem_read_as_vec(rip, 2).unwrap(); // TODO: check mapped
+
+                    // Fully functional RDRAND
+                    if code == &[0x0F, 0xC7] {
+                        emu.reg_write(RegisterX86::EIP as i32, rip + 3)
+                            .unwrap();
+                        let eflags = emu.reg_read(RegisterX86::EFLAGS as i32).unwrap();
+                        let eflags = (eflags & !0x8D4) | 0x1;
+                        emu.reg_write(RegisterX86::EFLAGS as i32, eflags).unwrap();
+                        return true;
+                    }
+
+                    false
+                })
+                .unwrap();
+
                 emu.add_code_hook(0, 0xFFFFFFFFFFFFFFFF, move |emu, ptr, len| {
+                    if len == 0xf1f1f1f1 {
+                        return;
+                    }
+                    
                     let code = emu.mem_read_as_vec(ptr, len as usize).unwrap();
 
                     let mut buffer = [0u8; 200];
@@ -137,7 +160,68 @@ impl ByondEmulator {
                     formatter.format_instruction(&instruction, &mut buffer, Some(ptr), None)
                         .unwrap();
 
-                    println!("0x{:08X}    {}", ptr, buffer);
+                    let mut registers: BTreeMap<&'static str, i32> = BTreeMap::new();
+
+                    for opcode in &instruction.operands[0..instruction.operand_count as usize] {
+                        if opcode.visibility != zydis::OperandVisibility::EXPLICIT {
+                            continue;
+                        }
+
+                        if opcode.ty != zydis::OperandType::REGISTER {
+                            continue;
+                        }
+
+                        use zydis::Register;
+
+                        match opcode.reg {
+                            Register::NONE => unreachable!(),
+                            Register::AH | Register::AL | Register::AX | Register::EAX => {
+                                let eax = emu.reg_read_i32(RegisterX86::EAX as i32).unwrap();
+                                registers.insert("eax", eax);
+                            }
+                            Register::CH | Register::CL | Register::CX | Register::ECX => {
+                                let ecx = emu.reg_read_i32(RegisterX86::ECX as i32).unwrap();
+                                registers.insert("ecx", ecx);
+                            }
+                            Register::DH | Register::DH | Register::DX | Register::EDX => {
+                                let edx = emu.reg_read_i32(RegisterX86::EDX as i32).unwrap();
+                                registers.insert("edx", edx);
+                            }
+                            Register::BH | Register::BL | Register::BX | Register::EBX => {
+                                let ebx = emu.reg_read_i32(RegisterX86::EBX as i32).unwrap();
+                                registers.insert("ebx", ebx);
+                            }
+                            Register::SPL | Register::SP | Register::ESP => {
+                                let esp = emu.reg_read_i32(RegisterX86::ESP as i32).unwrap();
+                                registers.insert("esp", esp);
+                            }
+                            Register::BPL | Register::BP | Register::EBP => {
+                                let ebp = emu.reg_read_i32(RegisterX86::EBP as i32).unwrap();
+                                registers.insert("ebp", ebp);
+                            }
+                            Register::SIL | Register::SI | Register::ESI => {
+                                let esi = emu.reg_read_i32(RegisterX86::ESI as i32).unwrap();
+                                registers.insert("esi", esi);
+                            }
+                            Register::DIL | Register::DI | Register::EDI => {
+                                let edi = emu.reg_read_i32(RegisterX86::EDI as i32).unwrap();
+                                registers.insert("edi", edi);
+                            }
+                            _ => {},
+                        }
+                    }
+
+                    let mut register_text = String::new();
+
+                    if !registers.is_empty() {
+                        for (name, value) in registers {
+                            register_text.push_str(&format!("{} = {:08x}, ", name, value));
+                        }
+
+                        register_text = (&register_text[..register_text.len() - 2]).to_owned();
+                    }
+
+                    println!("{:08x}    {: <48} {:}", ptr, buffer.to_string(), register_text);
                 })
                 .unwrap();
 
@@ -292,7 +376,7 @@ impl ByondEmulator {
             0,
             0,
             16000,
-        );
+        ).unwrap();
         
 
         StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32)
@@ -385,26 +469,24 @@ fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: 
 fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
-    println!("[0x2001401] = {}", dump.to_string(Value {
-        kind: 0x02,
-        data: 0x1401,
-    }));
+    //println!("[0x2001401] = {}", dump.to_string(Value {
+    //    kind: 0x02,
+    //    data: 0x1401,
+    //}));
+//
+    //println!("[0x2001412] = {}", dump.to_string(Value {
+    //    kind: 0x02,
+    //    data: 0x1412,
+    //}));
+//
+    //let mannitol_pill = Value {
+    //    kind: 0x02,
+    //    data: 0x1423,
+    //};
+//
+    //println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
+    //let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
+    //println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
 
-    println!("[0x2001412] = {}", dump.to_string(Value {
-        kind: 0x02,
-        data: 0x1412,
-    }));
-
-    let mannitol_pill = Value {
-        kind: 0x02,
-        data: 0x1423,
-    };
-
-    loop {
-        println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
-        let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
-        println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
-
-        println!("dynamic = {:?}", dump.get_string_id("fuckywucky151512"));
-    }
+    println!("dynamic = {:?}", dump.get_string_id("fuckywucky151512"));
 }
