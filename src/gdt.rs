@@ -47,7 +47,7 @@ fn create_gdt_entry(base: u64, limit: u64, access: u8, flags: u8) -> GdtEntry {
     to_ret.to_le_bytes()
 }
 
-pub fn create_basic_gdt() -> [u8; GDT_ENTRY_SIZE * GDT_COUNT] {
+pub fn create_basic_gdt(tib: u64) -> [u8; GDT_ENTRY_SIZE * GDT_COUNT] {
     let mut gdt: [GdtEntry; GDT_COUNT] = [[0; GDT_ENTRY_SIZE]; GDT_COUNT];
 
     gdt[1] = create_gdt_entry(
@@ -69,7 +69,7 @@ pub fn create_basic_gdt() -> [u8; GDT_ENTRY_SIZE * GDT_COUNT] {
         F_PROT_32,
     );
     gdt[4] = create_gdt_entry(
-        0x1000,
+        tib,
         0xfffff000,
         A_PRESENT | A_DATA | A_DATA_WRITABLE | A_PRIV_3 | A_DIR_CON_BIT,
         F_PROT_32,

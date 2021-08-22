@@ -25,10 +25,8 @@ use crate::structures::Value;
 
 // TODO: dynamic allocations for all of these
 const STACK_ADDRESS: u64 = 0x80000000;
-const STACK_SIZE: usize = 0x1000;
+const STACK_SIZE: usize = 0x100000;
 const GDT_ADDRESS: u64 = STACK_ADDRESS;
-const TIB_ADDRESS: u64 = 0x1000;
-const TIB_SIZE: usize = 0x1000;
 
 struct ByondEmulator {
     unicorn: Unicorn,
@@ -72,12 +70,26 @@ impl ByondEmulator {
                 this.stack_clear();
             }
 
-            
+            // Grab TIB ptr
+            let tib = {
+                let mut emu = this.unicorn.borrow();
+
+                let mut state = this.state.borrow_mut();
+                let threads: minidump::MinidumpThreadList = state.dump.get_stream().unwrap();
+                let thread = &threads.threads[0];
+
+                let tib64 = thread.raw.teb;
+                Self::ensure_mapped(&mut emu, &mut state, tib64, 4);
+
+                let mut bytes: [u8; 4] = [0, 0, 0, 0];
+                emu.mem_read(tib64, &mut bytes).unwrap();
+                u32::from_le_bytes(bytes) as u64
+            };
 
             // GDT (poor man's version)
             {
                 let mut emu = this.unicorn.borrow();
-                let gdt = gdt::create_basic_gdt();
+                let gdt = gdt::create_basic_gdt(tib);
                 emu.mem_write(GDT_ADDRESS, &gdt).unwrap();
 
                 let gdtr: X86Mmr = X86Mmr {
@@ -110,23 +122,8 @@ impl ByondEmulator {
                 emu.reg_write(RegisterX86::FS as i32, fs as u64).unwrap();
             }
 
-            // TIB (extreme poor man's version)
             {
                 let mut emu = this.unicorn.borrow();
-                emu.mem_map(TIB_ADDRESS, TIB_SIZE, Permission::ALL)
-                    .expect("failed to allocate tib");
-                emu.mem_write(TIB_ADDRESS + 0x18, &(TIB_ADDRESS as u32).to_le_bytes())
-                    .unwrap();
-            }
-
-
-            {
-                let mut emu = this.unicorn.borrow();
-
-                let formatter = zydis::Formatter::new(zydis::FormatterStyle::INTEL)
-                    .unwrap();
-                let decoder = zydis::Decoder::new(zydis::MachineMode::LONG_COMPAT_32, zydis::AddressWidth::_32)
-                    .unwrap();
 
                 emu.add_insn_invalid_hook(|mut emu| {
                     let rip = emu.reg_read(RegisterX86::EIP as i32).unwrap();
@@ -146,6 +143,11 @@ impl ByondEmulator {
                 })
                 .unwrap();
 
+                let formatter = zydis::Formatter::new(zydis::FormatterStyle::INTEL)
+                    .unwrap();
+                let decoder = zydis::Decoder::new(zydis::MachineMode::LONG_COMPAT_32, zydis::AddressWidth::_32)
+                    .unwrap();
+
                 emu.add_code_hook(0, 0xFFFFFFFFFFFFFFFF, move |emu, ptr, len| {
                     if len == 0xf1f1f1f1 {
                         return;
@@ -157,24 +159,17 @@ impl ByondEmulator {
                     let mut buffer = zydis::OutputBuffer::new(&mut buffer);
 
                     let instruction = decoder.decode(&code).unwrap().unwrap();
+
                     formatter.format_instruction(&instruction, &mut buffer, Some(ptr), None)
                         .unwrap();
 
                     let mut registers: BTreeMap<&'static str, i32> = BTreeMap::new();
 
-                    for opcode in &instruction.operands[0..instruction.operand_count as usize] {
-                        if opcode.visibility != zydis::OperandVisibility::EXPLICIT {
-                            continue;
-                        }
-
-                        if opcode.ty != zydis::OperandType::REGISTER {
-                            continue;
-                        }
-
+                    let mut write_register = |register: zydis::Register| {
                         use zydis::Register;
 
-                        match opcode.reg {
-                            Register::NONE => unreachable!(),
+                        match register {
+                            Register::NONE => {}
                             Register::AH | Register::AL | Register::AX | Register::EAX => {
                                 let eax = emu.reg_read_i32(RegisterX86::EAX as i32).unwrap();
                                 registers.insert("eax", eax);
@@ -183,7 +178,7 @@ impl ByondEmulator {
                                 let ecx = emu.reg_read_i32(RegisterX86::ECX as i32).unwrap();
                                 registers.insert("ecx", ecx);
                             }
-                            Register::DH | Register::DH | Register::DX | Register::EDX => {
+                            Register::DH | Register::DL | Register::DX | Register::EDX => {
                                 let edx = emu.reg_read_i32(RegisterX86::EDX as i32).unwrap();
                                 registers.insert("edx", edx);
                             }
@@ -209,19 +204,48 @@ impl ByondEmulator {
                             }
                             _ => {},
                         }
+                    };
+
+                    for operand in &instruction.operands[0..instruction.operand_count as usize] {
+                        if operand.visibility == zydis::OperandVisibility::HIDDEN {
+                            continue;
+                        }
+
+                        if !operand.action.intersects(zydis::OperandAction::MASK_READ)
+                        {
+                            continue;
+                        }
+
+                        match operand.ty {
+                            zydis::OperandType::REGISTER => {
+                                write_register(operand.reg);
+                            }
+
+                            zydis::OperandType::MEMORY => {
+                                write_register(operand.mem.base);
+                                write_register(operand.mem.index);
+                            }
+
+                            _ => {}
+                        }
                     }
 
                     let mut register_text = String::new();
 
                     if !registers.is_empty() {
                         for (name, value) in registers {
-                            register_text.push_str(&format!("{} = {:08x}, ", name, value));
+                            register_text.push_str(&format!("{} = {:08X}, ", name, value));
                         }
 
                         register_text = (&register_text[..register_text.len() - 2]).to_owned();
                     }
 
-                    println!("{:08x}    {: <48} {:}", ptr, buffer.to_string(), register_text);
+                    println!("{:08X}    {: <48} {:}", ptr, buffer.to_string(), register_text);
+                })
+                .unwrap();
+
+                emu.add_mem_hook(HookType::MEM_VALID, 0x00000000, 0xFFFFFFFF, |a, b, c, d, e| {
+                    // println!("READ {:x} -> {:x}", c, c + d as u64);
                 })
                 .unwrap();
 
@@ -247,7 +271,7 @@ impl ByondEmulator {
         // 乂 ≻‿≺) da
         // (≻‿≺ 乂 da
         // 乂 ≻‿≺) da
-        emu.mem_write(STACK_ADDRESS, &[0xda; STACK_SIZE]).unwrap();
+        emu.mem_write(STACK_ADDRESS + 0x100, &[0xda; STACK_SIZE - 0x100]).unwrap();
 
         emu.reg_write(RegisterX86::ESP as i32, STACK_ADDRESS + STACK_SIZE as u64)
             .unwrap();
@@ -375,8 +399,8 @@ impl ByondEmulator {
             self.functions.get_string_id.unwrap(),
             0,
             0,
-            16000,
-        ).unwrap();
+            160000,
+        );
         
 
         StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32)
@@ -418,8 +442,8 @@ impl ByondEmulator {
             self.functions.get_variable.unwrap(),
             0,
             0,
-            16000,
-        );
+            1600000,
+        ).unwrap();
 
         let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32;
         let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap() as u32;
@@ -469,24 +493,12 @@ fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: 
 fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
-    //println!("[0x2001401] = {}", dump.to_string(Value {
-    //    kind: 0x02,
-    //    data: 0x1401,
-    //}));
-//
-    //println!("[0x2001412] = {}", dump.to_string(Value {
-    //    kind: 0x02,
-    //    data: 0x1412,
-    //}));
-//
-    //let mannitol_pill = Value {
-    //    kind: 0x02,
-    //    data: 0x1423,
-    //};
-//
-    //println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
-    //let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
-    //println!("manitol_pill.loc = {:?}", dump.to_string(mannitol_pill_loc));
+    let mannitol_pill = Value {
+       kind: 0x02,
+       data: 0x1423,
+    };
 
-    println!("dynamic = {:?}", dump.get_string_id("fuckywucky151512"));
+    // println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
+    let mannitol_pill_loc = dump.get_field(mannitol_pill, "loccywocky");
+    println!("manitol_pill.loc = {:?}", mannitol_pill_loc);
 }
