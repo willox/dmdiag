@@ -1,8 +1,8 @@
-mod structures;
 mod functions;
 mod gdt;
 mod sigscan;
 mod stack_op;
+mod structures;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -131,8 +131,7 @@ impl ByondEmulator {
 
                     // Fully functional RDRAND
                     if code == &[0x0F, 0xC7] {
-                        emu.reg_write(RegisterX86::EIP as i32, rip + 3)
-                            .unwrap();
+                        emu.reg_write(RegisterX86::EIP as i32, rip + 3).unwrap();
                         let eflags = emu.reg_read(RegisterX86::EFLAGS as i32).unwrap();
                         let eflags = (eflags & !0x8D4) | 0x1;
                         emu.reg_write(RegisterX86::EFLAGS as i32, eflags).unwrap();
@@ -143,16 +142,18 @@ impl ByondEmulator {
                 })
                 .unwrap();
 
-                let formatter = zydis::Formatter::new(zydis::FormatterStyle::INTEL)
-                    .unwrap();
-                let decoder = zydis::Decoder::new(zydis::MachineMode::LONG_COMPAT_32, zydis::AddressWidth::_32)
-                    .unwrap();
+                let formatter = zydis::Formatter::new(zydis::FormatterStyle::INTEL).unwrap();
+                let decoder = zydis::Decoder::new(
+                    zydis::MachineMode::LONG_COMPAT_32,
+                    zydis::AddressWidth::_32,
+                )
+                .unwrap();
 
                 emu.add_code_hook(0, 0xFFFFFFFFFFFFFFFF, move |emu, ptr, len| {
                     if len == 0xf1f1f1f1 {
                         return;
                     }
-                    
+
                     let code = emu.mem_read_as_vec(ptr, len as usize).unwrap();
 
                     let mut buffer = [0u8; 200];
@@ -160,7 +161,8 @@ impl ByondEmulator {
 
                     let instruction = decoder.decode(&code).unwrap().unwrap();
 
-                    formatter.format_instruction(&instruction, &mut buffer, Some(ptr), None)
+                    formatter
+                        .format_instruction(&instruction, &mut buffer, Some(ptr), None)
                         .unwrap();
 
                     let mut registers: BTreeMap<&'static str, i32> = BTreeMap::new();
@@ -202,7 +204,7 @@ impl ByondEmulator {
                                 let edi = emu.reg_read_i32(RegisterX86::EDI as i32).unwrap();
                                 registers.insert("edi", edi);
                             }
-                            _ => {},
+                            _ => {}
                         }
                     };
 
@@ -211,8 +213,7 @@ impl ByondEmulator {
                             continue;
                         }
 
-                        if !operand.action.intersects(zydis::OperandAction::MASK_READ)
-                        {
+                        if !operand.action.intersects(zydis::OperandAction::MASK_READ) {
                             continue;
                         }
 
@@ -240,22 +241,36 @@ impl ByondEmulator {
                         register_text = (&register_text[..register_text.len() - 2]).to_owned();
                     }
 
-                    println!("{:08X}    {: <48} {:}", ptr, buffer.to_string(), register_text);
+                    println!(
+                        "{:08X}    {: <48} {:}",
+                        ptr,
+                        buffer.to_string(),
+                        register_text
+                    );
                 })
                 .unwrap();
 
-                emu.add_mem_hook(HookType::MEM_VALID, 0x00000000, 0xFFFFFFFF, |a, b, c, d, e| {
-                    // println!("READ {:x} -> {:x}", c, c + d as u64);
-                })
+                emu.add_mem_hook(
+                    HookType::MEM_VALID,
+                    0x00000000,
+                    0xFFFFFFFF,
+                    |a, b, c, d, e| {
+                        // println!("READ {:x} -> {:x}", c, c + d as u64);
+                    },
+                )
                 .unwrap();
 
                 let state = Rc::clone(&this.state);
-                emu.add_mem_invalid_hook(HookType::MEM_INVALID, 0, 0xFFFFFFFFFFFFFFFF, move |mut emu, a, b, c, d| {
-                    Self::ensure_mapped(&mut emu, &mut state.borrow_mut(), b, c)
-                })
+                emu.add_mem_invalid_hook(
+                    HookType::MEM_INVALID,
+                    0,
+                    0xFFFFFFFFFFFFFFFF,
+                    move |mut emu, a, b, c, d| {
+                        Self::ensure_mapped(&mut emu, &mut state.borrow_mut(), b, c)
+                    },
+                )
                 .unwrap();
             }
-
 
             // Kind of... bad
             this.functions = functions::Functions::new(&mut this);
@@ -271,7 +286,8 @@ impl ByondEmulator {
         // 乂 ≻‿≺) da
         // (≻‿≺ 乂 da
         // 乂 ≻‿≺) da
-        emu.mem_write(STACK_ADDRESS + 0x100, &[0xda; STACK_SIZE - 0x100]).unwrap();
+        emu.mem_write(STACK_ADDRESS + 0x100, &[0xda; STACK_SIZE - 0x100])
+            .unwrap();
 
         emu.reg_write(RegisterX86::ESP as i32, STACK_ADDRESS + STACK_SIZE as u64)
             .unwrap();
@@ -303,7 +319,12 @@ impl ByondEmulator {
     }
 
     // before accessing memory we need to make sure we've mapped it into the VM's memory space
-    fn ensure_mapped(emu: &mut UnicornHandle, state: &mut ByondState, ptr: u64, size: usize) -> bool {
+    fn ensure_mapped(
+        emu: &mut UnicornHandle,
+        state: &mut ByondState,
+        ptr: u64,
+        size: usize,
+    ) -> bool {
         let mut is_mapped = false;
 
         let pages: MinidumpMemoryList = state.dump.get_stream().unwrap();
@@ -333,24 +354,24 @@ impl ByondEmulator {
         self.stack_clear();
         self.stack_push(id.0);
         self.stack_push(0x00000000); // Return address (we'll handle the crash)
-    
+
         let mut emu = self.unicorn.borrow();
 
         // TODO: Actually check for success
-        let _ = emu.emu_start(
-            self.functions.get_string_table_entry.unwrap(),
-            0,
-            0,
-            16000,
-        );
-    
+        let _ = emu.emu_start(self.functions.get_string_table_entry.unwrap(), 0, 0, 16000);
+
         let ptr = emu.reg_read(RegisterX86::EAX as i32).unwrap();
-        ByondEmulator::ensure_mapped(&mut emu, &mut self.state.borrow_mut(), ptr, size_of::<structures::StringEntry>());
+        ByondEmulator::ensure_mapped(
+            &mut emu,
+            &mut self.state.borrow_mut(),
+            ptr,
+            size_of::<structures::StringEntry>(),
+        );
 
         let bytes = emu
             .mem_read_as_vec(ptr, size_of::<structures::StringEntry>())
             .unwrap();
-    
+
         // TODO: not good
         unsafe {
             let string_entry: *const structures::StringEntry = bytes.as_ptr() as *const _;
@@ -363,20 +384,25 @@ impl ByondEmulator {
         let mut characters: Vec<u8> = vec![];
 
         let mut emu = self.unicorn.borrow();
-    
+
         loop {
             let mut char: [u8; 1] = [0];
-            assert!(ByondEmulator::ensure_mapped(&mut emu, &mut self.state.borrow_mut(), ptr, 1));
+            assert!(ByondEmulator::ensure_mapped(
+                &mut emu,
+                &mut self.state.borrow_mut(),
+                ptr,
+                1
+            ));
             emu.mem_read(ptr, &mut char).unwrap();
-    
+
             if char[0] == 0 {
                 break;
             }
-    
+
             characters.push(char[0]);
             ptr += 1;
         }
-    
+
         String::from_utf8_lossy(&characters).to_string()
     }
 
@@ -395,13 +421,7 @@ impl ByondEmulator {
             .unwrap();
 
         // TODO: Actually check for success
-        let _ = emu.emu_start(
-            self.functions.get_string_id.unwrap(),
-            0,
-            0,
-            160000,
-        );
-        
+        let _ = emu.emu_start(self.functions.get_string_id.unwrap(), 0, 0, 160000);
 
         StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32)
     }
@@ -414,12 +434,7 @@ impl ByondEmulator {
         let mut emu = self.unicorn.borrow();
 
         // TODO: Actually check for success
-        let _ = emu.emu_start(
-            self.functions.to_string.unwrap(),
-            0,
-            0,
-            16000,
-        );
+        let _ = emu.emu_start(self.functions.to_string.unwrap(), 0, 0, 16000);
 
         let id = StringId(emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32);
 
@@ -438,12 +453,9 @@ impl ByondEmulator {
         let mut emu = self.unicorn.borrow();
 
         // TODO: Actually check for success
-        let _ = emu.emu_start(
-            self.functions.get_variable.unwrap(),
-            0,
-            0,
-            1600000,
-        ).unwrap();
+        let _ = emu
+            .emu_start(self.functions.get_variable.unwrap(), 0, 0, 1600000)
+            .unwrap();
 
         let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32;
         let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap() as u32;
@@ -494,8 +506,8 @@ fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
     let mannitol_pill = Value {
-       kind: 0x02,
-       data: 0x1423,
+        kind: 0x02,
+        data: 0x1423,
     };
 
     // println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
