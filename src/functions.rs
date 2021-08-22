@@ -21,12 +21,12 @@ impl Functions {
         let (byond_core_start, byond_core_size) = dump.find_module("byondcore.dll").unwrap();
 
         let mut emu = dump.unicorn.borrow();
-        assert!(ByondEmulator::ensure_mapped(
+        ByondEmulator::assert_mapped(
             &mut emu,
             &mut dump.state.borrow_mut(),
             byond_core_start,
             byond_core_size
-        ));
+        );
 
         let byond_core = emu
             .mem_read_as_vec(byond_core_start, byond_core_size)

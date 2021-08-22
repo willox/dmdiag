@@ -23,6 +23,8 @@ use minidump::{Minidump, MinidumpMemory, MinidumpMemoryList, MinidumpModuleList}
 use crate::stack_op::StackOp;
 use crate::structures::Value;
 
+const PAGE_SIZE: usize = 0x1000;
+
 // TODO: dynamic allocations for all of these
 const STACK_ADDRESS: u64 = 0x80000000;
 const STACK_SIZE: usize = 0x100000;
@@ -42,7 +44,9 @@ struct ByondState {
     dump: minidump::Minidump<'static, minidump::Mmap>, // 🤔
 
     // base addresses of memory regions that have already been mapped in
-    mapped: HashSet<u64>,
+    old_mapped: HashSet<u64>,
+
+    mapped: Vec<bool>,
 }
 
 impl ByondEmulator {
@@ -52,12 +56,16 @@ impl ByondEmulator {
 
         let dump = minidump::Minidump::read_path(path).expect("failed to load dump");
 
+        let mut mapped = vec![];
+        mapped.resize(usize::pow(2, 32) / PAGE_SIZE, false);
+
         let mut this = Self {
             unicorn,
             functions: Default::default(),
             state: Rc::new(RefCell::new(ByondState {
                 dump,
-                mapped: HashSet::new(),
+                old_mapped: HashSet::new(),
+                mapped,
             })),
         };
 
@@ -65,9 +73,15 @@ impl ByondEmulator {
             // Stack
             {
                 let mut emu = this.unicorn.borrow();
-                emu.mem_map(STACK_ADDRESS, STACK_SIZE, Permission::ALL)
-                    .expect("failed to allocate stack");
+                Self::manual_map(&mut emu, &mut this.state.borrow_mut(), STACK_ADDRESS, STACK_SIZE);
                 this.stack_clear();
+            }
+
+            // Exit Point
+            {
+                let mut emu = this.unicorn.borrow();
+                emu.mem_write(STACK_ADDRESS + 0x50, &[0xCC])
+                    .unwrap();
             }
 
             // Grab TIB ptr
@@ -79,7 +93,7 @@ impl ByondEmulator {
                 let thread = &threads.threads[0];
 
                 let tib64 = thread.raw.teb;
-                Self::ensure_mapped(&mut emu, &mut state, tib64, 4);
+                Self::assert_mapped(&mut emu, &mut state, tib64, 4);
 
                 let mut bytes: [u8; 4] = [0, 0, 0, 0];
                 emu.mem_read(tib64, &mut bytes).unwrap();
@@ -149,6 +163,7 @@ impl ByondEmulator {
                 )
                 .unwrap();
 
+                /*
                 emu.add_code_hook(0, 0xFFFFFFFFFFFFFFFF, move |emu, ptr, len| {
                     if len == 0xf1f1f1f1 {
                         return;
@@ -249,16 +264,7 @@ impl ByondEmulator {
                     );
                 })
                 .unwrap();
-
-                emu.add_mem_hook(
-                    HookType::MEM_VALID,
-                    0x00000000,
-                    0xFFFFFFFF,
-                    |a, b, c, d, e| {
-                        // println!("READ {:x} -> {:x}", c, c + d as u64);
-                    },
-                )
-                .unwrap();
+                */
 
                 let state = Rc::clone(&this.state);
                 emu.add_mem_invalid_hook(
@@ -266,7 +272,8 @@ impl ByondEmulator {
                     0,
                     0xFFFFFFFFFFFFFFFF,
                     move |mut emu, a, b, c, d| {
-                        Self::ensure_mapped(&mut emu, &mut state.borrow_mut(), b, c)
+                        Self::assert_mapped(&mut emu, &mut state.borrow_mut(), b, c);
+                        true
                     },
                 )
                 .unwrap();
@@ -318,36 +325,48 @@ impl ByondEmulator {
         None
     }
 
-    // before accessing memory we need to make sure we've mapped it into the VM's memory space
-    fn ensure_mapped(
+    fn manual_map(
         emu: &mut UnicornHandle,
         state: &mut ByondState,
         ptr: u64,
-        size: usize,
-    ) -> bool {
-        let mut is_mapped = false;
+        size: usize
+    ) {
+        for page_base in (ptr..size as u64).step_by(PAGE_SIZE) {
+            state.mapped[page_base as usize / PAGE_SIZE] = true;
+        };
 
-        let pages: MinidumpMemoryList = state.dump.get_stream().unwrap();
+        emu.mem_map(ptr, size, Permission::ALL)
+            .unwrap();
+    }
 
-        for page in pages.iter() {
-            if ptr < (page.base_address + page.size) && page.base_address < (ptr + size as u64) {
-                // TODO: Check that we have mapped multiple pages if necessary?
-                is_mapped = true;
+    fn assert_mapped(
+        emu: &mut UnicornHandle,
+        state: &mut ByondState,
+        ptr: u64,
+        size: usize
+    ) {
+        let size = size as u64;
 
-                // The page has already been mapped
-                if state.mapped.contains(&page.base_address) {
-                    continue;
+        let mut needs_to_map = false;
+        for page_base in (ptr..ptr + size as u64).step_by(PAGE_SIZE) {
+            if !state.mapped[page_base as usize / PAGE_SIZE] {
+                state.mapped[page_base as usize / PAGE_SIZE] = true;
+                needs_to_map = true;
+            }
+        };
+
+        if needs_to_map {
+            let pages: MinidumpMemoryList = state.dump.get_stream().unwrap();
+
+            for page in pages.iter() {
+                if ptr < (page.base_address + page.size) && page.base_address < (ptr + size as u64) {
+                    emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
+                        .unwrap();
+    
+                    emu.mem_write(page.base_address, page.bytes).unwrap();
                 }
-                state.mapped.insert(page.base_address);
-
-                emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
-                    .unwrap();
-
-                emu.mem_write(page.base_address, page.bytes).unwrap();
             }
         }
-
-        is_mapped
     }
 
     fn get_string_table_entry(&mut self, id: StringId) -> StringEntry {
@@ -361,7 +380,7 @@ impl ByondEmulator {
         let _ = emu.emu_start(self.functions.get_string_table_entry.unwrap(), 0, 0, 16000);
 
         let ptr = emu.reg_read(RegisterX86::EAX as i32).unwrap();
-        ByondEmulator::ensure_mapped(
+        ByondEmulator::assert_mapped(
             &mut emu,
             &mut self.state.borrow_mut(),
             ptr,
@@ -387,12 +406,12 @@ impl ByondEmulator {
 
         loop {
             let mut char: [u8; 1] = [0];
-            assert!(ByondEmulator::ensure_mapped(
+            ByondEmulator::assert_mapped(
                 &mut emu,
                 &mut self.state.borrow_mut(),
                 ptr,
                 1
-            ));
+            );
             emu.mem_read(ptr, &mut char).unwrap();
 
             if char[0] == 0 {
@@ -412,7 +431,7 @@ impl ByondEmulator {
         self.stack_push(0);
         self.stack_push(0);
         self.stack_push(STACK_ADDRESS as u32 + 0x100);
-        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+        self.stack_push(STACK_ADDRESS as u32 + 0x50); // Return address (we'll handle the crash)
 
         let mut emu = self.unicorn.borrow();
         emu.mem_write(STACK_ADDRESS + 0x100, string.as_bytes())
@@ -448,14 +467,16 @@ impl ByondEmulator {
         self.stack_clear();
         self.stack_push(field.0);
         self.stack_push(val);
-        self.stack_push(0x00000000); // Return address (we'll handle the crash)
+        self.stack_push(STACK_ADDRESS as u32 + 0x50); // Return address (we'll handle the crash)
 
         let mut emu = self.unicorn.borrow();
 
-        // TODO: Actually check for success
         let _ = emu
-            .emu_start(self.functions.get_variable.unwrap(), 0, 0, 1600000)
-            .unwrap();
+            .emu_start(self.functions.get_variable.unwrap(), 0, 0, 1600000);
+
+        if emu.reg_read(RegisterX86::EIP as i32).unwrap() != STACK_ADDRESS + 0x51 {
+            panic!("get_field failed");
+        }
 
         let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32;
         let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap() as u32;
@@ -467,41 +488,6 @@ impl ByondEmulator {
     }
 }
 
-fn find_byond_core<T>(dump: &Minidump<T>) -> Option<(u64, usize)>
-where
-    T: Deref<Target = [u8]>,
-{
-    let modules: MinidumpModuleList = dump.get_stream().unwrap();
-
-    for module in modules.iter() {
-        let path = std::path::Path::new(&module.name);
-
-        if path.file_name() == Some(&OsStr::new("byondcore.dll")) {
-            return Some((module.raw.base_of_image, module.raw.size_of_image as usize));
-        }
-    }
-
-    None
-}
-
-fn try_map(emu: &mut UnicornHandle, pages: &MinidumpMemoryList, ptr: u64, size: usize) -> bool {
-    let target_range = ptr..(ptr + size as u64);
-    let mut did_map = false;
-
-    for page in pages.iter() {
-        let range = page.base_address..(page.base_address + page.size);
-        if target_range.start < range.end && range.start < target_range.end {
-            // TODO: don't map twice!
-            let _ = emu.mem_map(page.base_address, page.size as usize, Permission::ALL);
-            let _ = emu.mem_write(page.base_address, page.bytes);
-
-            did_map = true;
-        }
-    }
-
-    did_map
-}
-
 fn main() {
     let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
 
@@ -510,7 +496,9 @@ fn main() {
         data: 0x1423,
     };
 
-    // println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
-    let mannitol_pill_loc = dump.get_field(mannitol_pill, "loccywocky");
-    println!("manitol_pill.loc = {:?}", mannitol_pill_loc);
+    loop {
+        println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
+        let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
+        println!("manitol_pill.loc = {:?}", mannitol_pill_loc);
+    }
 }
