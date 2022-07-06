@@ -1,12 +1,12 @@
-use unicorn::{RegisterX86, UnicornHandle};
+use unicorn_engine::{RegisterX86, Unicorn};
 
 pub trait StackOp {
-    fn push(&self, emu: &mut UnicornHandle);
-    fn pop(emu: &mut UnicornHandle) -> Self;
+    fn push(&self, emu: &mut Unicorn<'static, ()>);
+    fn pop(emu: &mut Unicorn<'static, ()>) -> Self;
 }
 
 impl StackOp for u32 {
-    fn push(&self, emu: &mut UnicornHandle) {
+    fn push(&self, emu: &mut Unicorn<'static, ()>) {
         let esp = emu
             .reg_read(RegisterX86::ESP as i32)
             .expect("failed to read esp")
@@ -20,7 +20,7 @@ impl StackOp for u32 {
             .expect("stack write failure");
     }
 
-    fn pop(emu: &mut UnicornHandle) -> Self {
+    fn pop(emu: &mut Unicorn<'static, ()>) -> Self {
         let esp = emu
             .reg_read(RegisterX86::ESP as i32)
             .expect("failed to read esp");

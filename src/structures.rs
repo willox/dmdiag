@@ -1,5 +1,5 @@
 use crate::stack_op::StackOp;
-use unicorn::UnicornHandle;
+use unicorn_engine::Unicorn;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -25,12 +25,12 @@ pub struct Value {
 }
 
 impl StackOp for Value {
-    fn push(&self, emu: &mut UnicornHandle) {
+    fn push(&self, emu: &mut Unicorn<'static, ()>) {
         StackOp::push(&self.data, emu);
         StackOp::push(&(self.kind as u32), emu);
     }
 
-    fn pop(emu: &mut UnicornHandle) -> Self {
+    fn pop(emu: &mut Unicorn<'static, ()>) -> Self {
         let kind: u32 = StackOp::pop(emu);
         let data: u32 = StackOp::pop(emu);
 

@@ -13,6 +13,9 @@ pub struct Functions {
 
     // (string id) -> byond::StringEntry
     pub get_string_table_entry: Option<u64>,
+
+    // (Value list, Value index) -> Value
+    pub get_assoc_element: Option<u64>,
 }
 
 impl Functions {
@@ -20,7 +23,7 @@ impl Functions {
         // Find get_variable
         let (byond_core_start, byond_core_size) = dump.find_module("byondcore.dll").unwrap();
 
-        let mut emu = dump.unicorn.borrow();
+        let mut emu = &mut dump.unicorn;
         ByondEmulator::assert_mapped(
             &mut emu,
             &mut dump.state.borrow_mut(),
@@ -185,11 +188,70 @@ impl Functions {
         )
         .map(|x| byond_core_start + x as u64);
 
+        let get_assoc_element = sigscan::find(
+            &byond_core,
+            &[
+                Some(0x55),
+                Some(0x8B),
+                Some(0xEC),
+                Some(0x51),
+                Some(0x8B),
+                Some(0x4D),
+                Some(0x08),
+                Some(0xC6),
+                Some(0x45),
+                Some(0xFF),
+                Some(0x00),
+                Some(0x80),
+                Some(0xF9),
+                Some(0x05),
+                Some(0x76),
+                Some(0x11),
+                Some(0x80),
+                Some(0xF9),
+                Some(0x21),
+                Some(0x74),
+                Some(0x10),
+                Some(0x80),
+                Some(0xF9),
+                Some(0x0D),
+                Some(0x74),
+                Some(0x0B),
+                Some(0x80),
+                Some(0xF9),
+                Some(0x0E),
+                Some(0x75),
+                Some(0x65),
+                Some(0xEB),
+                Some(0x04),
+                Some(0x84),
+                Some(0xC9),
+                Some(0x74),
+                Some(0x5F),
+                Some(0x6A),
+                Some(0x00),
+                Some(0x8D),
+                Some(0x45),
+                Some(0xFF),
+                Some(0x50),
+                Some(0xFF),
+                Some(0x75),
+                Some(0x0C),
+                Some(0x51),
+                Some(0x6A),
+                Some(0x00),
+                Some(0x6A),
+                Some(0x7B)
+            ],
+        )
+        .map(|x| byond_core_start + x as u64);
+
         Functions {
             get_variable,
             get_string_id,
             to_string,
             get_string_table_entry,
+            get_assoc_element,
         }
     }
 }

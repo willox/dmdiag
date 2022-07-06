@@ -15,10 +15,10 @@ use std::path::Path;
 use std::rc::Rc;
 
 use structures::{StringEntry, StringId};
-use unicorn::unicorn_const::{Arch, HookType, Mode, Permission, SECOND_SCALE};
-use unicorn::{RegisterX86, Unicorn, UnicornHandle, X86Mmr};
+use unicorn_engine::unicorn_const::{Arch, HookType, Mode, Permission, SECOND_SCALE};
+use unicorn_engine::{RegisterX86, Unicorn, X86Mmr};
 
-use minidump::{Minidump, MinidumpMemory, MinidumpMemoryList, MinidumpModuleList};
+use minidump::{Minidump, MinidumpMemory, MinidumpMemoryList, MinidumpModuleList, MinidumpMemory64List};
 
 use crate::stack_op::StackOp;
 use crate::structures::Value;
@@ -31,7 +31,7 @@ const STACK_SIZE: usize = 0x100000;
 const GDT_ADDRESS: u64 = STACK_ADDRESS;
 
 struct ByondEmulator {
-    unicorn: Unicorn,
+    unicorn: Unicorn<'static, ()>,
 
     // addresses of byond functions
     functions: functions::Functions,
@@ -41,7 +41,7 @@ struct ByondEmulator {
 }
 
 struct ByondState {
-    dump: minidump::Minidump<'static, minidump::Mmap>, // 🤔
+    dump: minidump::Minidump<'static, memmap2::Mmap>, // 🤔
 
     // base addresses of memory regions that have already been mapped in
     old_mapped: HashSet<u64>,
@@ -51,10 +51,18 @@ struct ByondState {
 
 impl ByondEmulator {
     fn new(path: &Path) -> Self {
-        let unicorn = unicorn::Unicorn::new(Arch::X86, Mode::MODE_32)
+        let unicorn = unicorn_engine::Unicorn::new(Arch::X86, Mode::MODE_32)
             .expect("failed to initialize Unicorn instance");
 
         let dump = minidump::Minidump::read_path(path).expect("failed to load dump");
+
+        let mut maps = vec![];
+
+        let pages: MinidumpMemory64List = dump.get_stream().unwrap();
+
+        for page in pages.iter() {
+            maps.push((page.base_address, page.base_address as usize));
+        }
 
         let mut mapped = vec![];
         mapped.resize(usize::pow(2, 32) / PAGE_SIZE, false);
@@ -72,21 +80,21 @@ impl ByondEmulator {
         {
             // Stack
             {
-                let mut emu = this.unicorn.borrow();
+                let mut emu = &mut this.unicorn;
                 Self::manual_map(&mut emu, &mut this.state.borrow_mut(), STACK_ADDRESS, STACK_SIZE);
                 this.stack_clear();
             }
 
             // Exit Point
             {
-                let mut emu = this.unicorn.borrow();
+                let mut emu = &mut this.unicorn;
                 emu.mem_write(STACK_ADDRESS + 0x50, &[0xCC])
                     .unwrap();
             }
 
             // Grab TIB ptr
             let tib = {
-                let mut emu = this.unicorn.borrow();
+                let mut emu = &mut this.unicorn;
 
                 let mut state = this.state.borrow_mut();
                 let threads: minidump::MinidumpThreadList = state.dump.get_stream().unwrap();
@@ -102,7 +110,7 @@ impl ByondEmulator {
 
             // GDT (poor man's version)
             {
-                let mut emu = this.unicorn.borrow();
+                let mut emu = &mut this.unicorn;
                 let gdt = gdt::create_basic_gdt(tib);
                 emu.mem_write(GDT_ADDRESS, &gdt).unwrap();
 
@@ -117,7 +125,7 @@ impl ByondEmulator {
                         &gdtr as *const _ as *const u8,
                         std::mem::size_of::<X86Mmr>(),
                     );
-                    emu.reg_write_long(RegisterX86::GDTR as i32, gdtr.to_vec().into_boxed_slice())
+                    emu.reg_write_long(RegisterX86::GDTR as i32, &gdtr.to_vec().into_boxed_slice())
                         .unwrap();
                 }
 
@@ -137,7 +145,8 @@ impl ByondEmulator {
             }
 
             {
-                let mut emu = this.unicorn.borrow();
+                {
+                let mut emu = &mut this.unicorn;
 
                 emu.add_insn_invalid_hook(|mut emu| {
                     let rip = emu.reg_read(RegisterX86::EIP as i32).unwrap();
@@ -267,6 +276,13 @@ impl ByondEmulator {
                 */
 
                 let state = Rc::clone(&this.state);
+                
+                emu.add_mem_hook(HookType::MEM_INVALID, 0, 0xFFFFFFFF, move |mut emu, a, b, c, d| {
+                    Self::assert_mapped(&mut emu, &mut state.borrow_mut(), b, c);
+                    true
+                }).unwrap();
+
+                /*
                 emu.add_mem_invalid_hook(
                     HookType::MEM_INVALID,
                     0,
@@ -277,8 +293,10 @@ impl ByondEmulator {
                     },
                 )
                 .unwrap();
+                */
             }
 
+            }
             // Kind of... bad
             this.functions = functions::Functions::new(&mut this);
         }
@@ -287,7 +305,7 @@ impl ByondEmulator {
     }
 
     fn stack_clear(&mut self) {
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
 
         // (≻‿≺ 乂 da
         // 乂 ≻‿≺) da
@@ -301,11 +319,11 @@ impl ByondEmulator {
     }
 
     fn stack_push<T: StackOp>(&mut self, value: T) {
-        value.push(&mut self.unicorn.borrow());
+        value.push(&mut self.unicorn);
     }
 
     fn stack_pop<T: StackOp>(&mut self) -> T {
-        T::pop(&mut self.unicorn.borrow())
+        T::pop(&mut self.unicorn)
     }
 
     // searches for a module in the dump and returns its memory region
@@ -326,7 +344,7 @@ impl ByondEmulator {
     }
 
     fn manual_map(
-        emu: &mut UnicornHandle,
+        emu: &mut Unicorn<'static, ()>,
         state: &mut ByondState,
         ptr: u64,
         size: usize
@@ -340,7 +358,7 @@ impl ByondEmulator {
     }
 
     fn assert_mapped(
-        emu: &mut UnicornHandle,
+        emu: &mut Unicorn<'_, ()>,
         state: &mut ByondState,
         ptr: u64,
         size: usize
@@ -356,13 +374,11 @@ impl ByondEmulator {
         };
 
         if needs_to_map {
-            let pages: MinidumpMemoryList = state.dump.get_stream().unwrap();
+            let pages: MinidumpMemory64List = state.dump.get_stream().unwrap();
 
             for page in pages.iter() {
                 if ptr < (page.base_address + page.size) && page.base_address < (ptr + size as u64) {
-                    emu.mem_map(page.base_address, page.size as usize, Permission::ALL)
-                        .unwrap();
-    
+                    emu.mem_map(page.base_address, page.size as usize, Permission::ALL);
                     emu.mem_write(page.base_address, page.bytes).unwrap();
                 }
             }
@@ -374,7 +390,7 @@ impl ByondEmulator {
         self.stack_push(id.0);
         self.stack_push(0x00000000); // Return address (we'll handle the crash)
 
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
 
         // TODO: Actually check for success
         let _ = emu.emu_start(self.functions.get_string_table_entry.unwrap(), 0, 0, 16000);
@@ -398,11 +414,35 @@ impl ByondEmulator {
         }
     }
 
+    fn get_assoc_element(&mut self, list: structures::Value, key: structures::Value) -> structures::Value {
+        self.stack_clear();
+        self.stack_push(key);
+        self.stack_push(list);
+        self.stack_push(STACK_ADDRESS as u32 + 0x50);
+
+        let mut emu = &mut self.unicorn;
+
+        // TODO: Actually check for success
+        let _ = emu.emu_start(self.functions.get_assoc_element.unwrap(), 0, 0, 16000);
+
+        if emu.reg_read(RegisterX86::EIP as i32).unwrap() != STACK_ADDRESS + 0x51 {
+            panic!("get_field failed");
+        }
+
+        let eax = emu.reg_read(RegisterX86::EAX as i32).unwrap() as u32;
+        let edx = emu.reg_read(RegisterX86::EDX as i32).unwrap() as u32;
+
+        Value {
+            kind: eax as u8,
+            data: edx,
+        }
+    }
+
     fn read_null_terminated_string(&mut self, ptr: u32) -> String {
         let mut ptr = ptr as u64;
         let mut characters: Vec<u8> = vec![];
 
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
 
         loop {
             let mut char: [u8; 1] = [0];
@@ -433,7 +473,7 @@ impl ByondEmulator {
         self.stack_push(STACK_ADDRESS as u32 + 0x100);
         self.stack_push(STACK_ADDRESS as u32 + 0x50); // Return address (we'll handle the crash)
 
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
         emu.mem_write(STACK_ADDRESS + 0x100, string.as_bytes())
             .unwrap();
         emu.mem_write(STACK_ADDRESS + 0x100 + string.len() as u64, &[0])
@@ -450,7 +490,7 @@ impl ByondEmulator {
         self.stack_push(val);
         self.stack_push(0x00000000); // Return address (we'll handle the crash)
 
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
 
         // TODO: Actually check for success
         let _ = emu.emu_start(self.functions.to_string.unwrap(), 0, 0, 16000);
@@ -469,7 +509,7 @@ impl ByondEmulator {
         self.stack_push(val);
         self.stack_push(STACK_ADDRESS as u32 + 0x50); // Return address (we'll handle the crash)
 
-        let mut emu = self.unicorn.borrow();
+        let mut emu = &mut self.unicorn;
 
         let _ = emu
             .emu_start(self.functions.get_variable.unwrap(), 0, 0, 1600000);
@@ -489,16 +529,50 @@ impl ByondEmulator {
 }
 
 fn main() {
-    let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/tgstation.dmp"));
+    let mut dump = ByondEmulator::new(Path::new("E:/dmdiag/dump.dmp"));
 
-    let mannitol_pill = Value {
-        kind: 0x02,
-        data: 0x1423,
+    let globals_var = Value {
+        kind: 0x52,
+        data: 0x0000,
     };
 
-    loop {
-        println!("manitol_pill = {:?}", dump.to_string(mannitol_pill));
-        let mannitol_pill_loc = dump.get_field(mannitol_pill, "loc");
-        println!("manitol_pill.loc = {:?}", mannitol_pill_loc);
-    }
+    let string = dump.get_string_id("SSgarbage");
+    let string = structures::Value {
+        kind: 0x06,
+        data: string.0,
+    };
+
+    println!("GLOB = {:?}", dump.to_string(globals_var));
+    let ss_garbage = dump.get_assoc_element(globals_var, string);
+    let queues = dump.get_field(ss_garbage, "queues");
+    let queue = dump.get_assoc_element(queues, structures::Value {
+        kind: 0x2A,
+        data: f32::to_bits(2.0),
+    });
+
+    for i in 1..5000 {
+        let entry = dump.get_assoc_element(queue, structures::Value {
+            kind: 0x2A,
+            data: f32::to_bits(i as f32),
+        });
+
+        let ref_string = dump.to_string(entry);
+        let kind = u8::from_str_radix(&ref_string[3..(ref_string.len()-7)], 16).unwrap();
+        let data = u32::from_str_radix(&ref_string[5..(ref_string.len()) - 1], 16).unwrap();
+
+        let value = structures::Value {
+            kind,
+            data,
+        };
+
+        if kind == 0x21 || kind == 0x02 || kind == 0x03  {
+            let path = dump.get_field(value, "type");
+
+            println!("queues[1][{}] = {} = {:?}", i, ref_string, dump.to_string(path));
+        }
+        else
+        {
+            println!("queues[1][{}] = {} = {:?}", i, ref_string, dump.to_string(value));
+        }
+    }  
 }
